@@ -1,0 +1,8 @@
+{  
+  "name": "Azure OpenAI SDK Conversation",  
+  "content_in_root": false,  
+  "domain": "azure_openai_sdk_conversation",  
+  "render_readme": true,  
+  "homeassistant": "2024.10.0",  
+  "iot_class": "cloud_polling"  
+}  
