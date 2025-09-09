@@ -1,31 +1,27 @@
-name: Validate HACS
-
-on:
-  push:
-    paths:
-      - 'custom_components/**'
-      - '.github/workflows/validate_hacs.yml'
-  pull_request:
-    paths:
-      - 'custom_components/**'
-      - '.github/workflows/validate_hacs.yml'
-
-jobs:
-  hacs:
-    name: HACS Validation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-
-      - name: Install requirements
-        run: |
-          pip install -r https://raw.githubusercontent.com/hacs/action/main/requirements.txt
-
-      - name: Run HACS validation
-        run: hacs validate
+name: Validate HACS  
+  
+on:  
+  push:  
+    paths:  
+      - "custom_components/**"  
+      - ".github/workflows/validate_hacs.yml"  
+  pull_request:  
+    paths:  
+      - "custom_components/**"  
+      - ".github/workflows/validate_hacs.yml"  
+  
+jobs:  
+  hacs:  
+    name: HACS Validation  
+    runs-on: ubuntu-latest  
+  
+    steps:  
+      # Clona il repository  
+      - name: Checkout code  
+        uses: actions/checkout@v4  
+  
+      # Esegue la validazione HACS  
+      - name: HACS validate  
+        uses: hacs/action@main        # oppure @v2 quando verrà taggata  
+        with:  
+          category: integration       # integration | plugin | theme | appdaemon  
