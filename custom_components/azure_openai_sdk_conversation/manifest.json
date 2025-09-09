@@ -1,5 +1,4 @@
 {
-  "domain": "azure_openai_sdk_conversation",
   "name": "Azure OpenAI SDK Conversation",
   "dependencies": [
     "conversation",
