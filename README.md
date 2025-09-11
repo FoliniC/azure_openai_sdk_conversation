@@ -60,7 +60,8 @@ For unrelated topics, respond based on your general knowledge.
 ```
 </li>
 <li>Ability to configure and modify endpoint, model, max tokens on options.<br/>
-<img width="431" height="452" alt="image" src="https://github.com/user-attachments/assets/d14d2ac1-87d7-4537-b4bd-7e4c386bacf0" />
+<img width="431" height="452" alt="image" src="https://github.com/user-attachments/assets/656a3d06-9e0d-4a8a-b78e-c56016fe00c0" />
+
 </li>
 </ul>
 
