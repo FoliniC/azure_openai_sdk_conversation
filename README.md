@@ -1,4 +1,4 @@
-Note: this project it's experimental 'till this note remains. 
+Note: this project it's experimental 'till this note remains. <br/>
 This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, it's based on the original OpenAI Conversation integration for Home Assistant.
 
 What It Does
