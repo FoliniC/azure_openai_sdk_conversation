@@ -1,268 +1,190 @@
-"""Options flow per Azure OpenAI SDK Conversation – versione ≥ 2025.9."""  
-  
+"""Options flow per Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
-import logging  
-from typing import Any, Mapping  
+from typing import Any  
   
 import voluptuous as vol  
-from homeassistant.components.zone import ENTITY_ID_HOME  
-from homeassistant.config_entries import ConfigEntry, ConfigFlowResult, OptionsFlow  
-from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_API_KEY  
-from homeassistant.core import HomeAssistant  
-from homeassistant.helpers import llm  
-from homeassistant.helpers.httpx_client import get_async_client  
+from homeassistant.config_entries import ConfigEntry, OptionsFlow  
+from homeassistant.data_entry_flow import FlowResult  
 from homeassistant.helpers.selector import (  
-    NumberSelector,  
-    NumberSelectorConfig,  
-    SelectOptionDict,  
-    SelectSelector,  
-    SelectSelectorConfig,  
-    SelectSelectorMode,  
-    TemplateSelector,  
+  SelectOptionDict,  
+  SelectSelector,  
+  SelectSelectorConfig,  
+  SelectSelectorMode,  
+  TextSelector,  
+  TextSelectorConfig,  
+  NumberSelector,  
+  NumberSelectorConfig,  
+  NumberSelectorMode,  
+  BooleanSelector,  
 )  
-from homeassistant.helpers.typing import VolDictType  
-from openai import AsyncAzureOpenAI  
   
-from . import normalize_azure_endpoint  
-from .const import (  
-    CONF_API_BASE,  
-    CONF_API_TIMEOUT,  
-    CONF_API_VERSION,  
-    CONF_CHAT_MODEL,  
-    CONF_MAX_TOKENS,  
-    CONF_PROMPT,  
-    CONF_REASONING_EFFORT,  
-    CONF_RECOMMENDED,  
-    CONF_TEMPERATURE,  
-    CONF_TOP_P,  
-    CONF_WEB_SEARCH,  
-    CONF_WEB_SEARCH_CONTEXT_SIZE,  
-    CONF_WEB_SEARCH_USER_LOCATION,  
-    DOMAIN,  
-    RECOMMENDED_CHAT_MODEL,  
-    RECOMMENDED_MAX_TOKENS,  
-    RECOMMENDED_REASONING_EFFORT,  
-    RECOMMENDED_TEMPERATURE,  
-    RECOMMENDED_TOP_P,  
-    RECOMMENDED_WEB_SEARCH,  
-    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
-    RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
-    RECOMMENDED_API_TIMEOUT,  
-    UNSUPPORTED_MODELS,  
-    WEB_SEARCH_MODELS,  
-)  
 from .utils import APIVersionManager  
   
-_LOGGER = logging.getLogger(__name__)  
+CONF_CONV_API_VERSION = "conversation_api_version"  
+_SENTINEL_SAME = "__same__"  
+  
+# Chiavi opzioni supportate  
+CONF_ENDPOINT = "endpoint"  
+CONF_DEPLOYMENT = "deployment"  
+CONF_SYSTEM_MESSAGE = "system_message"  
+CONF_API_VERSION = "api_version"  
+CONF_MAX_TOKENS = "max_tokens"  
+CONF_TEMPERATURE = "temperature"  
+CONF_API_TIMEOUT = "api_timeout"  
+CONF_FORCE_MODE = "force_responses_mode"  
+  
+CONF_ENABLE_SEARCH = "enable_web_search"  
+CONF_BING_KEY = "bing_api_key"  
+CONF_BING_ENDPOINT = "bing_endpoint"  
+CONF_BING_MAX = "bing_max_results"  
+  
+# Debug SSE  
+CONF_DEBUG_SSE = "debug_sse"  
+CONF_DEBUG_SSE_LINES = "debug_sse_lines"  
   
   
 class AzureOpenAIOptionsFlow(OptionsFlow):  
-    """Gestione delle opzioni per una config-entry esistente."""  
+  """Gestione delle opzioni dell'integrazione."""  
   
-    def __init__(self, config_entry: ConfigEntry) -> None:  
-        self.config_entry = config_entry  
-        self.last_rendered_recommended = config_entry.options.get(CONF_RECOMMENDED, False)  
-        # Pre-popoliamo con le versioni note; se la versione in uso non è nota, la aggiungiamo.  
-        self.available_api_versions: list[str] = list(APIVersionManager._KNOWN)  # type: ignore[attr-defined]  
-        current_ver = config_entry.options.get(CONF_API_VERSION)  
-        if current_ver and current_ver not in self.available_api_versions:  
-            self.available_api_versions.insert(0, current_ver)  
+  def __init__(self, config_entry: ConfigEntry) -> None:  
+    self._entry = config_entry  
   
-    # --------------------------------------------------------------------- STEP unico  
-    async def async_step_init(  
-        self, user_input: dict[str, Any] | None = None  
-    ) -> ConfigFlowResult:  # noqa: D401  
-        base_options: dict[str, Any] = {**self.config_entry.data, **self.config_entry.options}  
+  async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:  
+    """Schermata di opzioni avanzate."""  
+    current = dict(self._entry.options)  
+    data = dict(self._entry.data)  
   
-        errors: dict[str, str] = {}  
+    # Opzioni per api_version e conversation_api_version  
+    versions = list(getattr(APIVersionManager, "_KNOWN", {}) or {})  
+    if "2025-03-01-preview" not in versions:  
+      versions.append("2025-03-01-preview")  
+    versions = sorted(versions)  
   
-        # --------------------------- salvataggio ---------------------------  
-        if user_input is not None:  
-            if user_input[CONF_RECOMMENDED] == self.last_rendered_recommended:  
-                # Casting numerico  
-                for fld in (CONF_TEMPERATURE, CONF_TOP_P):  
-                    if fld in user_input:  
-                        user_input[fld] = float(user_input[fld])  
-                for fld in (CONF_MAX_TOKENS, CONF_API_TIMEOUT):  
-                    if fld in user_input:  
-                        user_input[fld] = int(user_input[fld])  
+    api_ver_options = [SelectOptionDict(label=v, value=v) for v in versions]  
   
-                if user_input.get(CONF_CHAT_MODEL) in UNSUPPORTED_MODELS:  
-                    errors[CONF_CHAT_MODEL] = "model_not_supported"  
+    conv_api_options = [SelectOptionDict(label="Usa la stessa API version globale", value=_SENTINEL_SAME)]  
+    conv_api_options.extend(SelectOptionDict(label=v, value=v) for v in versions)  
   
-                if (  
-                    user_input.get(CONF_WEB_SEARCH)  
-                    and user_input.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL)  
-                    not in WEB_SEARCH_MODELS  
-                ):  
-                    errors[CONF_WEB_SEARCH] = "web_search_not_supported"  
+    # Opzioni per forza Responses/Chat  
+    force_mode_options = [  
+      SelectOptionDict(label="Automatico (in base al nome del deployment)", value="auto"),  
+      SelectOptionDict(label="Forza Responses API", value="responses"),  
+      SelectOptionDict(label="Forza Chat Completions", value="chat"),  
+    ]  
   
-                cleaned = {k: v for k, v in user_input.items() if v not in ("", None)}  
+    schema = vol.Schema(  
+      {  
+        # Endpoint e Deployment  
+        vol.Optional(  
+          CONF_ENDPOINT,  
+          default=current.get(CONF_ENDPOINT, data.get("api_base", "")),  
+        ): TextSelector(TextSelectorConfig(multiline=False)),  
+        vol.Optional(  
+          CONF_DEPLOYMENT,  
+          default=current.get(CONF_DEPLOYMENT, data.get("chat_model", "")),  
+        ): TextSelector(TextSelectorConfig(multiline=False)),  
   
-                if not errors:  
-                    _LOGGER.debug(  
-                        "Saving AzureOpenAI options: %s",  
-                        {  
-                            k: ("***" if k == CONF_API_KEY else v)  
-                            for k, v in cleaned.items()  
-                        },  
-                    )  
-                    return self.async_create_entry(title="", data=cleaned)  
+        # System message  
+        vol.Optional(  
+          CONF_SYSTEM_MESSAGE,  
+          default=current.get(CONF_SYSTEM_MESSAGE, "You are Home Assistant’s AI helper."),  
+        ): TextSelector(TextSelectorConfig(multiline=True)),  
   
-            # L’utente ha commutato il flag “recommended”: rielabora schema  
-            self.last_rendered_recommended = user_input[CONF_RECOMMENDED]  
-            base_options.update(user_input)  
+        # Versioni API  
+        vol.Optional(  
+          CONF_API_VERSION,  
+          default=current.get(CONF_API_VERSION, data.get("api_version", "2025-03-01-preview")),  
+        ): SelectSelector(SelectSelectorConfig(options=api_ver_options, mode=SelectSelectorMode.DROPDOWN)),  
+        vol.Optional(  
+          CONF_CONV_API_VERSION,  
+          default=current.get(CONF_CONV_API_VERSION, _SENTINEL_SAME),  
+        ): SelectSelector(SelectSelectorConfig(options=conv_api_options, mode=SelectSelectorMode.DROPDOWN)),  
   
-        # --------------------------- rendering form ------------------------  
-        schema = self._option_schema(self.hass, base_options)  
-        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema), errors=errors)  
+        # Parametri modello  
+        vol.Optional(  
+          CONF_MAX_TOKENS,  
+          default=current.get(CONF_MAX_TOKENS, 1024),  
+        ): NumberSelector(NumberSelectorConfig(min=1, max=32768, step=1, mode=NumberSelectorMode.BOX)),  
+        vol.Optional(  
+          CONF_TEMPERATURE,  
+          default=current.get(CONF_TEMPERATURE, 0.7),  
+        ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.1, mode=NumberSelectorMode.BOX)),  
+        vol.Optional(  
+          CONF_API_TIMEOUT,  
+          default=current.get(CONF_API_TIMEOUT, 30),  
+        ): NumberSelector(NumberSelectorConfig(min=5, max=120, step=1, mode=NumberSelectorMode.BOX)),  
   
-    # ------------------------------------------------------------------ schema helper  
-    def _option_schema(self, hass: HomeAssistant, options: Mapping[str, Any]) -> VolDictType:  
-        """Genera dinamicamente lo schema dell’options-flow."""  
-        hass_apis: list[SelectOptionDict] = [  
-            SelectOptionDict(label=api.name, value=api.id) for api in llm.async_get_apis(hass)  
-        ]  
-        suggested_llm_apis = options.get("llm_hass_api")  
-        if isinstance(suggested_llm_apis, str):  
-            suggested_llm_apis = [suggested_llm_apis]  
+        # Forza modalità Responses/Chat  
+        vol.Optional(  
+          CONF_FORCE_MODE,  
+          default=current.get(CONF_FORCE_MODE, "auto"),  
+        ): SelectSelector(SelectSelectorConfig(options=force_mode_options, mode=SelectSelectorMode.DROPDOWN)),  
   
-        schema: VolDictType = {  
-            vol.Optional(  
-                CONF_PROMPT,  
-                description={  
-                    "suggested_value": options.get(CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT)  
-                },  
-            ): TemplateSelector(),  
-            vol.Optional(  
-                "llm_hass_api",  
-                description={"suggested_value": suggested_llm_apis},  
-            ): SelectSelector(  
-                SelectSelectorConfig(options=hass_apis, multiple=True)  
-            ),  
-            vol.Required(  
-                CONF_RECOMMENDED,  
-                default=options.get(CONF_RECOMMENDED, False),  
-            ): bool,  
-        }  
+        # Web search  
+        vol.Optional(  
+          CONF_ENABLE_SEARCH,  
+          default=current.get(CONF_ENABLE_SEARCH, False),  
+        ): BooleanSelector(),  
+        vol.Optional(  
+          CONF_BING_KEY,  
+          default=current.get(CONF_BING_KEY, ""),  
+        ): TextSelector(TextSelectorConfig(multiline=False)),  
+        vol.Optional(  
+          CONF_BING_ENDPOINT,  
+          default=current.get(CONF_BING_ENDPOINT, ""),  
+        ): TextSelector(TextSelectorConfig(multiline=False)),  
+        vol.Optional(  
+          CONF_BING_MAX,  
+          default=current.get(CONF_BING_MAX, 5),  
+        ): NumberSelector(NumberSelectorConfig(min=1, max=25, step=1, mode=NumberSelectorMode.BOX)),  
   
-        # In modalità “recommended” chiediamo solo i 3 campi base  
-        if options.get(CONF_RECOMMENDED):  
-            return schema  
+        # Debug SSE  
+        vol.Optional(  
+          CONF_DEBUG_SSE,  
+          default=current.get(CONF_DEBUG_SSE, False),  
+        ): BooleanSelector(),  
+        vol.Optional(  
+          CONF_DEBUG_SSE_LINES,  
+          default=current.get(CONF_DEBUG_SSE_LINES, 10),  
+        ): NumberSelector(NumberSelectorConfig(min=1, max=100, step=1, mode=NumberSelectorMode.BOX)),  
+      }  
+    )  
   
-        # ---------- campi avanzati ---------------------------------------  
-        api_version_options = [  
-            SelectOptionDict(label=v, value=v) for v in self.available_api_versions  
-        ]  
+    if user_input is None:  
+      return self.async_show_form(step_id="init", data_schema=schema)  
   
-        schema.update(  
-            {  
-                vol.Optional(  
-                    CONF_API_BASE,  
-                    description={"suggested_value": options.get(CONF_API_BASE)},  
-                    default=options.get(CONF_API_BASE, ""),  
-                ): str,  
-                vol.Optional(  
-                    CONF_CHAT_MODEL,  
-                    description={"suggested_value": options.get(CONF_CHAT_MODEL)},  
-                    default=options.get(CONF_CHAT_MODEL, ""),  
-                ): str,  
-                vol.Optional(  
-                    CONF_API_VERSION,  
-                    description={"suggested_value": options.get(CONF_API_VERSION)},  
-                    default=options.get(CONF_API_VERSION, APIVersionManager.best_for_model("")),  # type: ignore[arg-type]  
-                ): SelectSelector(  
-                    SelectSelectorConfig(  
-                        options=api_version_options,  
-                        mode=SelectSelectorMode.DROPDOWN,  
-                    )  
-                ),  
-                vol.Optional(  
-                    CONF_MAX_TOKENS,  
-                    description={"suggested_value": options.get(CONF_MAX_TOKENS)},  
-                    default=RECOMMENDED_MAX_TOKENS,  
-                ): int,  
-                vol.Optional(  
-                    CONF_TOP_P,  
-                    description={"suggested_value": options.get(CONF_TOP_P)},  
-                    default=RECOMMENDED_TOP_P,  
-                ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),  
-                vol.Optional(  
-                    CONF_TEMPERATURE,  
-                    description={"suggested_value": options.get(CONF_TEMPERATURE)},  
-                    default=RECOMMENDED_TEMPERATURE,  
-                ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),  
-                vol.Optional(  
-                    CONF_REASONING_EFFORT,  
-                    description={"suggested_value": options.get(CONF_REASONING_EFFORT)},  
-                    default=RECOMMENDED_REASONING_EFFORT,  
-                ): SelectSelector(  
-                    SelectSelectorConfig(  
-                        options=["low", "medium", "high"],  
-                        translation_key=CONF_REASONING_EFFORT,  
-                        mode=SelectSelectorMode.DROPDOWN,  
-                    )  
-                ),  
-                vol.Optional(  
-                    CONF_WEB_SEARCH,  
-                    description={"suggested_value": options.get(CONF_WEB_SEARCH)},  
-                    default=RECOMMENDED_WEB_SEARCH,  
-                ): bool,  
-                vol.Optional(  
-                    CONF_WEB_SEARCH_CONTEXT_SIZE,  
-                    description={"suggested_value": options.get(CONF_WEB_SEARCH_CONTEXT_SIZE)},  
-                    default=RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
-                ): SelectSelector(  
-                    SelectSelectorConfig(  
-                        options=["low", "medium", "high"],  
-                        translation_key=CONF_WEB_SEARCH_CONTEXT_SIZE,  
-                        mode=SelectSelectorMode.DROPDOWN,  
-                    )  
-                ),  
-                vol.Optional(  
-                    CONF_WEB_SEARCH_USER_LOCATION,  
-                    description={  
-                        "suggested_value": options.get(CONF_WEB_SEARCH_USER_LOCATION)  
-                    },  
-                    default=RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
-                ): bool,  
-                vol.Optional(  
-                    CONF_API_TIMEOUT,  
-                    description={"suggested_value": options.get(CONF_API_TIMEOUT)},  
-                    default=RECOMMENDED_API_TIMEOUT,  
-                ): NumberSelector(NumberSelectorConfig(min=5, max=120, step=1)),  
-            }  
-        )  
-        return schema  
+    # Salvataggio opzioni, preservando tutte le altre  
+    new_options = dict(self._entry.options)  
   
-    # ------------------------------------------------------------------ extra helper (facoltativo)  
-    async def _approximate_location(self, hass: HomeAssistant) -> dict[str, str]:  
-        """Stima la location dell’utente partendo dalla zone.home (facoltativa)."""  
-        location: dict[str, str] = {}  
-        zone_home = hass.states.get(ENTITY_ID_HOME)  
-        if zone_home is None:  
-            return location  
+    # Campi diretti  
+    for key in (  
+      CONF_ENDPOINT,  
+      CONF_DEPLOYMENT,  
+      CONF_SYSTEM_MESSAGE,  
+      CONF_API_VERSION,  
+      CONF_MAX_TOKENS,  
+      CONF_TEMPERATURE,  
+      CONF_API_TIMEOUT,  
+      CONF_FORCE_MODE,  
+      CONF_ENABLE_SEARCH,  
+      CONF_BING_KEY,  
+      CONF_BING_ENDPOINT,  
+      CONF_BING_MAX,  
+      CONF_DEBUG_SSE,  
+      CONF_DEBUG_SSE_LINES,  
+    ):  
+      if key in user_input:  
+        if user_input[key] in (None, ""):  
+          new_options.pop(key, None)  
+        else:  
+          new_options[key] = user_input[key]  
   
-        api_base = self.config_entry.data[CONF_API_BASE]  
-        root = normalize_azure_endpoint(api_base).rstrip("/").removesuffix("/openai")  
-        client = AsyncAzureOpenAI(  
-            api_key=self.config_entry.data[CONF_API_KEY],  
-            api_version=APIVersionManager.best_for_model(""),  # any  
-            azure_endpoint=root,  
-            http_client=get_async_client(hass),  
-        )  
+    # conversation_api_version con sentinel  
+    sel = user_input.get(CONF_CONV_API_VERSION, _SENTINEL_SAME)  
+    if sel == _SENTINEL_SAME:  
+      new_options.pop(CONF_CONV_API_VERSION, None)  
+    else:  
+      new_options[CONF_CONV_API_VERSION] = sel  
   
-        prompt = (  
-            f"Where are the following coordinates located: "  
-            f"({zone_home.attributes[ATTR_LATITUDE]}, {zone_home.attributes[ATTR_LONGITUDE]})?"  
-        )  
-  
-        resp = await client.chat.completions.create(  
-            model=self.config_entry.options.get(CONF_CHAT_MODEL, RECOMMENDED_CHAT_MODEL),  
-            messages=[{"role": "user", "content": prompt}],  
-            max_tokens=32,  
-        )  
-        # risposta in plain-text, nessuna elaborazione ulteriore  
-        location["raw"] = resp.choices[0].message.content  # type: ignore[index]  
-        return location  
+    return self.async_create_entry(title="", data=new_options)  

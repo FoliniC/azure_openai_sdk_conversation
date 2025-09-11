@@ -1,462 +1,758 @@
-"""Conversation entity backed by Azure OpenAI Chat Completions."""  
+"""Conversation provider for Azure OpenAI with optional web-search context."""  
 from __future__ import annotations  
   
-import asyncio  
-import importlib  
-import inspect  
+from typing import Any  
+import json  
 import logging  
-import uuid  
-from typing import Any, Literal, cast  
+import re  
   
-import openai  
 from homeassistant.components import conversation  
+from homeassistant.components.conversation import AbstractConversationAgent, ConversationInput  
 from homeassistant.config_entries import ConfigEntry  
-from homeassistant.const import CONF_API_KEY, MATCH_ALL  
+from homeassistant.const import CONF_API_KEY  
 from homeassistant.core import HomeAssistant  
-from homeassistant.exceptions import HomeAssistantError  
-from homeassistant.helpers import llm  
-from homeassistant.helpers.entity_platform import AddEntitiesCallback  
 from homeassistant.helpers.httpx_client import get_async_client  
-from homeassistant.helpers.template import Template, TemplateError  
-from homeassistant.util import ulid  
-from homeassistant.helpers import entity_registry as er  
-  
-from . import normalize_azure_endpoint  
-from .const import (  
-    CONF_API_BASE,  
-    CONF_CHAT_MODEL,  
-    CONF_MAX_TOKENS,  
-    CONF_PROMPT,  
-    CONF_TEMPERATURE,  
-    CONF_TOP_P,  
-    CONF_API_TIMEOUT,  
-    DOMAIN,  
-    RECOMMENDED_CHAT_MODEL,  
-    RECOMMENDED_MAX_TOKENS,  
-    RECOMMENDED_TEMPERATURE,  
-    RECOMMENDED_TOP_P,  
-    RECOMMENDED_API_TIMEOUT,  
+from homeassistant.helpers.typing import HomeAssistantType  
+from homeassistant.helpers.entity_platform import AddEntitiesCallback  
+from homeassistant.helpers import intent as intent_helper  
+from homeassistant.helpers.template import Template as HATemplate  
+from homeassistant.helpers import (  
+  area_registry as ar,  
+  entity_registry as er,  
+  device_registry as dr,  
 )  
   
-# ---------------------------------------------------------------  
-#  `CONF_LLM_HASS_API` può non esistere su release < 2024.10  
-# ---------------------------------------------------------------  
-try:  
-    from homeassistant.const import CONF_LLM_HASS_API  # type: ignore  
-except ImportError:  # pragma: no cover  
-    CONF_LLM_HASS_API = "llm_hass_api"  # type: ignore  
+from .search import WebSearchClient  
+  
+DOMAIN = "azure_openai_sdk_conversation"  
+  
+CONF_ENABLE_SEARCH = "enable_web_search"  
+CONF_BING_KEY = "bing_api_key"  
+CONF_BING_ENDPOINT = "bing_endpoint"  
+CONF_BING_MAX = "bing_max_results"  
+  
+# opzioni extra  
+CONF_CONV_API_VERSION = "conversation_api_version"  
+CONF_FORCE_MODE = "force_responses_mode"  
+  
+# altre chiavi opzioni configurabili  
+CONF_ENDPOINT = "endpoint"  
+CONF_DEPLOYMENT = "deployment"  
+  
+# Debug SSE  
+CONF_DEBUG_SSE = "debug_sse"  
+CONF_DEBUG_SSE_LINES = "debug_sse_lines"  
+  
+# Sentinel opzione "usa stessa api_version globale"  
+_SENTINEL_SAME = "__same__"  
   
 _LOGGER = logging.getLogger(__name__)  
   
-# ----------------------------------------------------------------------  
-#  ConversationResult / AgentResponseText import-helper  
-# ----------------------------------------------------------------------  
-def _best_effort_imports() -> tuple[type, type, bool]:  
-    """  
-    Return (AgentResponseText, ConversationResult, expects_agent_response).  
-    """  
-    # ---- ConversationResult -----------------------------------------  
+  
+class AzureOpenAIConversationAgent(AbstractConversationAgent):  
+  """Conversation agent che usa Azure OpenAI; può includere risultati web."""  
+  
+  def __init__(self, hass: HomeAssistantType, conf: dict[str, Any]) -> None:  
+    super().__init__()  
+    self._hass = hass  
+    self._conf = conf  
+    self._http = get_async_client(hass)  
+  
+    # Endpoint e parametri Azure  
+    self._endpoint: str = (conf.get(CONF_ENDPOINT) or conf.get("api_base", "")).rstrip("/")  
+    self._deployment: str = conf.get(CONF_DEPLOYMENT) or conf.get("chat_model", "")  
+    self._api_version: str = self._normalize_api_version(conf)  
+    self._timeout: int = int(conf.get("api_timeout", 30))  
+    self._force_mode: str = conf.get(CONF_FORCE_MODE, "auto")  # auto|responses|chat  
+  
+    self._headers_json = {  
+      "api-key": conf[CONF_API_KEY],  
+      "Content-Type": "application/json",  
+    }  
+    self._headers_sse = {  
+      "api-key": conf[CONF_API_KEY],  
+      "Content-Type": "application/json",  
+      "Accept": "text/event-stream",  
+      "Connection": "keep-alive",  
+      "Cache-Control": "no-cache",  
+    }  
+  
+    # Debug SSE  
+    self._debug_sse: bool = bool(conf.get(CONF_DEBUG_SSE, False))  
+    self._debug_sse_lines: int = int(conf.get(CONF_DEBUG_SSE_LINES, 10))  
+  
+    # Web Search opzionale  
+    self._search: WebSearchClient | None = None  
+    if conf.get(CONF_ENABLE_SEARCH):  
+      self._search = WebSearchClient(  
+        api_key=conf.get(CONF_BING_KEY, ""),  
+        endpoint=conf.get(CONF_BING_ENDPOINT, WebSearchClient.BING_ENDPOINT_DEFAULT),  
+        max_results=int(conf.get(CONF_BING_MAX, 5)),  
+      )  
+  
+  @staticmethod  
+  def _normalize_api_version(conf: dict[str, Any]) -> str:  
+    """Ritorna la api-version effettiva da usare, normalizzando il sentinel."""  
+    conv_ver = conf.get(CONF_CONV_API_VERSION)  
+    if not conv_ver or str(conv_ver).strip() in (_SENTINEL_SAME, ""):  
+      base = conf.get("api_version")  
+      return base or "2025-03-01-preview"  
+    return str(conv_ver).strip()  
+  
+  @staticmethod  
+  def _ver_date_tuple(ver: str) -> tuple[int, int, int]:  
+    core = (ver or "").split("-preview")[0]  
+    parts = core.split("-")  
     try:  
-        from homeassistant.components.conversation import (  # type: ignore  
-            ConversationResult as CR,  
-        )  
-    except ImportError:  
-        CR = None  # type: ignore[assignment]  
+      return (int(parts[0]), int(parts[1]), int(parts[2]))  
+    except Exception:  # noqa: BLE001  
+      return (1900, 1, 1)  
   
-    if CR is None:  
-        class _ConversationResultShim:  # noqa: D401  
-            def __init__(  
-                self,  
-                response: Any,  
-                conversation_id: str | None = None,  
-                continue_conversation: bool | None = False,  
-            ) -> None:  
-                self.response = response  
-                self.conversation_id = conversation_id  
-                self.continue_conversation = continue_conversation  
+  def _ensure_min_version(self, ver: str, minimum: str) -> str:  
+    """Ritorna 'ver' se >= minimum altrimenti 'minimum'."""  
+    v = self._ver_date_tuple(ver)  
+    m = self._ver_date_tuple(minimum)  
+    return ver if v >= m else minimum  
   
-        CR = cast(type, _ConversationResultShim)  # type: ignore[initial-value]  
+  def _collect_exposed_entities(self) -> list[dict[str, Any]]:  
+    """Costruisce una lista di entità per il template: entity_id, name, state, area, aliases[]."""  
+    area_reg = ar.async_get(self._hass)  
+    ent_reg = er.async_get(self._hass)  
+    dev_reg = dr.async_get(self._hass)  
   
-    # ---- AgentResponseText ------------------------------------------  
-    AgentCls: type | None = None  
-    for mod_name in (  
-        "homeassistant.components.conversation.response",  
-        "homeassistant.components.conversation.agent",  
-        "homeassistant.components.assist_pipeline.response",  
-        "homeassistant.components.assist_pipeline.agent",  
-    ):  
-        try:  
-            mod = importlib.import_module(mod_name)  
-        except ModuleNotFoundError:  
-            continue  
-        for attr in (  
-            "AgentResponseText",  
-            "TextAgentResponse",  
-            "PlainTextResponse",  
-            "TextResponse",  
-        ):  
-            AgentCls = getattr(mod, attr, None)  
-            if isinstance(AgentCls, type):  
-                break  
-        if AgentCls:  
-            break  
+    out: list[dict[str, Any]] = []  
+    for st in self._hass.states.async_all():  
+      area_name = ""  
+      entry = ent_reg.async_get(st.entity_id)  
+      area_id = None  
+      if entry:  
+        area_id = entry.area_id  
+        if not area_id and entry.device_id:  
+          dev = dev_reg.async_get(entry.device_id)  
+          if dev and dev.area_id:  
+            area_id = dev.area_id  
+      if area_id:  
+        area = area_reg.async_get_area(area_id)  
+        if area and area.name:  
+          area_name = area.name  
   
-    if AgentCls is None:  
-        class _AgentResponseTextShim:  # type: ignore[too-few-public-methods]  
-            def __init__(self, text: str | None = None, **kwargs: Any) -> None:  
-                self.text = text or kwargs.get("text", "")  
-                self.speech = {"plain": {"text": self.text}}  
+      out.append(  
+        {  
+          "entity_id": st.entity_id,  
+          "name": st.name or st.entity_id,  
+          "state": st.state,  
+          "area": area_name,  
+          "aliases": [],  # alias non disponibili qui  
+        }  
+      )  
+    return out  
   
-        AgentCls = _AgentResponseTextShim  # type: ignore[assignment]  
-  
-    # ---- does ConversationResult expect an AgentResponse*? ----------  
+  @staticmethod  
+  def _format_val(val: Any) -> str:  
+    if isinstance(val, (str, int, float, bool)) or val is None:  
+      return str(val)  
     try:  
-        sig = inspect.signature(CR)  # type: ignore[arg-type]  
-        expects = "AgentResponse" in str(sig.parameters["response"].annotation)  
-    except Exception:  
-        expects = True  
+      return json.dumps(val, ensure_ascii=False)  
+    except Exception:  # noqa: BLE001  
+      return str(val)  
   
-    return AgentCls, CR, expects  
+  async def _render_system_message(self, raw_sys_msg: str, azure_ctx: dict[str, Any]) -> str:  
+    """Renderizza il system_message; fallback: sostituzione regex per {{ azure.* }}."""  
+    sys_msg = raw_sys_msg  
   
-AgentResponseText, ConversationResult, _EXPECTS_AGENT_RSP = _best_effort_imports()  
+    # 1) Prova render Jinja con HATemplate (azure + exposed_entities)  
+    try:  
+      tmpl = HATemplate(raw_sys_msg, hass=self._hass)  
+      sys_msg = await tmpl.async_render(  
+        {  
+          "azure": azure_ctx,  
+          "exposed_entities": self._collect_exposed_entities(),  
+        }  
+      )  
+    except Exception as err:  # noqa: BLE001  
+      _LOGGER.debug("System message template render failed, will try regex fallback: %s", err)  
   
-# ----------------------------------------------------------------------  
-#  Misc helpers  
-# ----------------------------------------------------------------------  
-def _token_param() -> str:  
-    return (  
-        "max_tokens"  
-        if "max_tokens" in getattr(openai, "__all__", [])  # type: ignore[attr-defined]  
-        else "max_completion_tokens"  
+    # 2) Fallback: sostituisci tutti i {{ azure.xxx }} rimasti  
+    pat = re.compile(r"{{\s*azure\.([a-zA-Z0-9_]+)\s*}}")  
+    if pat.search(sys_msg):  
+      def _sub(m: re.Match[str]) -> str:  
+        key = m.group(1)  
+        return self._format_val(azure_ctx.get(key, ""))  
+      sys_msg = pat.sub(_sub, sys_msg)  
+  
+    return sys_msg  
+  
+  @property  
+  def supported_languages(self) -> list[str]:  
+    return ["en", "it"]  
+  
+  async def async_process(self, user_input: ConversationInput):  
+    """Return the assistant response (non streaming per HA)."""  
+    # Selezione endpoint: Responses per modelli "o*" o se forzato; Chat altrimenti  
+    if self._force_mode == "responses":  
+      use_responses = True  
+    elif self._force_mode == "chat":  
+      use_responses = False  
+    else:  
+      use_responses = bool(self._deployment and self._deployment.lower().startswith("o"))  
+  
+    # Prepara contesto 'azure' per il templating del system_message  
+    def _responses_token_param_for_version(ver: str) -> str:  
+      y, m, d = self._ver_date_tuple(ver)  
+      return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"  
+  
+    def _chat_token_param_for_version(ver: str) -> str:  
+      y, m, d = self._ver_date_tuple(ver)  
+      return "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"  
+  
+    effective_version_for_mode = (  
+      self._ensure_min_version(self._api_version, "2025-03-01-preview") if use_responses else self._api_version  
+    )  
+    token_param = (  
+      _responses_token_param_for_version(effective_version_for_mode)  
+      if use_responses else  
+      _chat_token_param_for_version(effective_version_for_mode)  
     )  
   
-# ----------------------------------------------------------------------  
-#  Platform setup  
-# ----------------------------------------------------------------------  
-async def async_setup_entry(  
-    hass: HomeAssistant,  
-    entry: ConfigEntry,  
-    async_add_entities: AddEntitiesCallback,  
-) -> None:  
-    async_add_entities([AzureOpenAIConversationEntity(hass, entry)])  
+    azure_ctx = {  
+      "endpoint": self._endpoint,  
+      "deployment": self._deployment,  
+      "model": self._deployment,  
+      "api_version": effective_version_for_mode,  
+      "mode": "responses" if use_responses else "chat",  
+      "token_param": token_param,  
+      "max_tokens": int(self._conf.get("max_tokens", 1024)),  
+      "temperature": float(self._conf.get("temperature", 0.7)),  
+      "api_timeout": self._timeout,  
+      "search_enabled": bool(self._conf.get(CONF_ENABLE_SEARCH, False)),  
+      "debug_sse": self._debug_sse,  
+    }  
   
-class AzureOpenAIConversationEntity(  
-    conversation.ConversationEntity, conversation.AbstractConversationAgent  
-):  
-    """Conversation agent – Azure OpenAI Chat Completions."""  
+    # System message personalizzabile + template (con fallback regex) e blocco identità se necessario  
+    raw_sys_msg = self._conf.get("system_message") or "You are Home Assistant’s AI helper."  
+    sys_msg = await self._render_system_message(raw_sys_msg, azure_ctx)  
   
-    _attr_should_poll = False  
-    _attr_supports_streaming = False  
+    unresolved_azure = bool(re.search(r"{{\s*azure\.", sys_msg))  
+    contains_azure = ("azure." in raw_sys_msg)  
+    if unresolved_azure or not contains_azure:  
+      identity_text = (  
+        "Identità: assistente per Home Assistant.\n"  
+        f"Endpoint: {azure_ctx['endpoint']}\n"  
+        f"Deployment/Model: {azure_ctx['deployment']}\n"  
+        f"API version: {azure_ctx['api_version']}\n"  
+        f"Mode: {azure_ctx['mode']}\n"  
+        f"Token param: {azure_ctx['token_param']}\n"  
+        f"Max tokens: {azure_ctx['max_tokens']}\n"  
+        f"Temperature: {azure_ctx['temperature']}\n"  
+        f"Timeout: {azure_ctx['api_timeout']}s\n"  
+        f"Web search: {azure_ctx['search_enabled']}"  
+      )  
+      sys_msg = f"{sys_msg}\n\n{identity_text}"  
   
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:  
-        self.hass = hass  
-        self._entry = entry  
+    messages_chat: list[dict[str, str]] = [{"role": "system", "content": sys_msg}]  
   
-        data = entry.data  
-        opts = entry.options or {}  
-  
-        self._api_base: str = opts.get(CONF_API_BASE) or data[CONF_API_BASE]  
-        self._model: str = (  
-            opts.get(CONF_CHAT_MODEL)  
-            or data.get(CONF_CHAT_MODEL)  
-            or RECOMMENDED_CHAT_MODEL  
+    # 1) Web-search (opzionale)  
+    if self._search:  
+      query = user_input.text  
+      try:  
+        search_md = await self._search.search(query)  
+      except Exception as err:  # noqa: BLE001  
+        _LOGGER.warning("Web search failed: %s", err)  
+        search_md = ""  
+      if search_md:  
+        messages_chat.append(  
+          {"role": "system", "content": "Real-time web search results:\n\n" + search_md}  
         )  
-        self._prompt: str = opts.get(CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT)  
-        self._temperature: float = float(  
-            opts.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE)  
-        )  
-        self._top_p: float = float(opts.get(CONF_TOP_P, RECOMMENDED_TOP_P))  
-        self._max_tokens: int = int(opts.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS))  
-        self._api_timeout: int = int(opts.get(CONF_API_TIMEOUT, RECOMMENDED_API_TIMEOUT))  
   
-        # ---------- visibilità / naming --------------------------------  
-        self._attr_name = f"Azure OpenAI SDK Conversation – {self._model}"  
-        self._attr_entity_id = (  
-            f"conversation.azure_openai_sdk_conversation_{entry.entry_id[-6:]}"  
-        )  
-        self._attr_unique_id = entry.entry_id  
+    # 2) Messaggio utente  
+    messages_chat.append({"role": "user", "content": user_input.text})  
   
-        # ---------- HASS-API abilitation -------------------------------  
-        llm_api_opt = opts.get(CONF_LLM_HASS_API)  
-        if isinstance(llm_api_opt, list):  
-            llm_api_opt = (  
-                llm.LLM_API_ASSIST if llm.LLM_API_ASSIST in llm_api_opt else None  
+    _LOGGER.debug(  
+      "Starting conversation using %s API (deployment=%s, api-version configured=%s)",  
+      "Responses" if use_responses else "Chat",  
+      self._deployment,  
+      self._api_version,  
+    )  
+  
+    text_out = ""  
+    try:  
+      if use_responses:  
+        # Responses API: impone minimo "2025-03-01-preview"  
+        next_version = self._ensure_min_version(self._api_version, "2025-03-01-preview")  
+        url = f"{self._endpoint}/openai/responses"  
+  
+        # Converte i messaggi chat nello schema Responses: content(type=input_text)  
+        def _to_input(msgs: list[dict[str, str]]) -> list[dict[str, Any]]:  
+          out: list[dict[str, Any]] = []  
+          for m in msgs:  
+            out.append(  
+              {  
+                "role": m["role"],  
+                "content": [{"type": "input_text", "text": m["content"]}],  
+              }  
             )  
-        self._attr_llm_hass_api = llm_api_opt or llm.LLM_API_ASSIST  
+          return out  
   
-        self._client: openai.AsyncAzureOpenAI | None = None  
-        self._history: dict[str, list[dict[str, Any]]] = {}  
-        self._history_lock = asyncio.Lock()  
-        self._max_history = 12  
+        def _responses_token_param_for_version_local(ver: str) -> str:  
+          y, m, d = self._ver_date_tuple(ver)  
+          return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"  
   
-    # ------------------------------------------------------------------  
-    #  Client helper  
-    # ------------------------------------------------------------------  
-    async def _get_client(self) -> openai.AsyncAzureOpenAI:  
-        if self._client is None:  
-            _LOGGER.debug("Creating Azure OpenAI client for %s", self._api_base)  
-            from openai import AsyncAzureOpenAI  
+        attempted: set[str] = set()  
+        res_token_param: str | None = None  
+        use_messages_format = False  # prima tentativo con "input", poi (se serve) "messages+instructions"  
   
-            root = (  
-                normalize_azure_endpoint(self._api_base)  
-                .rstrip("/")  
-                .removesuffix("/openai")  
-            )  
-            self._client = AsyncAzureOpenAI(  
-                api_key=self._entry.data[CONF_API_KEY],  
-                api_version="2025-01-01-preview",  
-                azure_endpoint=root,  
-                http_client=get_async_client(self.hass),  
-            )  
-        return self._client  
+        while True:  
+          if res_token_param is None:  
+            res_token_param = _responses_token_param_for_version_local(next_version)  
   
-    # ------------------------------------------------------------------  
-    #  Prompt / history helpers  
-    # ------------------------------------------------------------------  
-    async def _get_exposed_entities(self) -> list[Any]:  
-        """Return entities for conversation with area support."""  
-        ent_reg = er.async_get(self.hass)  
-        entities: list[dict[str, Any]] = []  
-        for st in self.hass.states.async_all():  
-            entry = ent_reg.async_get(st.entity_id)  
-            entities.append(  
-                {  
-                    "entity_id": st.entity_id,  
-                    "name": st.name or st.entity_id,  
-                    "state": st.state,  
-                    "aliases": [],  
-                    "area": entry.area_id if entry else None,  
-                }  
-            )  
-        return entities  
+          fmt = "messages" if use_messages_format else "input"  
+          pair_key = f"{next_version}::{res_token_param}::fmt={fmt}"  
+          if pair_key in attempted:  
+            break  
+          attempted.add(pair_key)  
   
-    async def _render_prompt(  
-        self, user_input: str, conversation_id: str | None  
-    ) -> str:  
-        """Evaluate the Jinja2 template stored in self._prompt."""  
-        if not self._prompt:  
-            return ""  
-        try:  
-            tpl = Template(self._prompt, self.hass)  
-            rendered = tpl.async_render(  
-                {  
-                    "user_input": user_input,  
-                    "conversation_id": conversation_id,  
-                    "hass": self.hass,  
-                    "exposed_entities": await self._get_exposed_entities(),  
-                },  
-                parse_result=False,  
-            )  
-            if inspect.isawaitable(rendered):  
-                rendered = await rendered  # type: ignore[assignment]  
-            return str(rendered).strip()  
-        except TemplateError as err:  
-            _LOGGER.error("Prompt template render error: %s", err)  
-            return self._prompt  
+          _LOGGER.debug(  
+            "Calling Responses API api-version=%s with token param=%s (format=%s, effective)",  
+            next_version,  
+            res_token_param,  
+            fmt,  
+          )  
   
-    async def _build_messages(  
-        self, user_input: str, conv_id: str | None  
-    ) -> list[dict[str, Any]]:  
-        msgs: list[dict[str, Any]] = []  
-        if self._prompt:  
-            rendered_prompt = await self._render_prompt(user_input, conv_id)  
-            if rendered_prompt:  
-                msgs.append({"role": "system", "content": rendered_prompt})  
-        if conv_id and (hist := self._history.get(conv_id)):  
-            msgs.extend(hist)  
-        msgs.append({"role": "user", "content": user_input})  
-        return msgs  
+          # Costruzione payload (Responses 2025-03-01-preview: usare 'text.format' non 'response_format')  
+          payload: dict[str, Any] = {  
+            "model": self._deployment,  
+            res_token_param: int(self._conf.get("max_tokens", 1024)),  
+            "temperature": float(self._conf.get("temperature", 0.7)),  
+            "stream": True,  
+            "modalities": ["text"],  
+            "text": {"format": "text"},  
+          }  
+          if use_messages_format:  
+            # alcune implementazioni preferiscono "messages" e "instructions"  
+            payload["messages"] = _to_input(messages_chat)  # mantiene i ruoli  
+            payload["instructions"] = sys_msg  
+          else:  
+            payload["input"] = _to_input(messages_chat)  
   
-    async def _update_history(  
-        self,  
-        conv_id: str | None,  
-        user_msg: dict[str, Any],  
-        assistant_msg: dict[str, Any],  
-    ) -> None:  
-        if not conv_id:  
-            return  
-        async with self._history_lock:  
-            hist = self._history.setdefault(conv_id, [])  
-            hist.extend([user_msg, assistant_msg])  
-            if len(hist) > self._max_history:  
-                self._history[conv_id] = hist[-self._max_history :]  
+          async with self._http.stream(  
+            "POST",  
+            url,  
+            params={"api-version": next_version},  
+            headers=self._headers_sse,  
+            json=payload,  
+            timeout=self._timeout,  
+          ) as resp:  
+            if resp.status_code >= 400:  
+              body = await resp.aread()  
+              text_body = body.decode("utf-8", "ignore")  
+              try:  
+                err_json = json.loads(text_body or "{}")  
+              except Exception:  
+                err_json = {}  
+              msg = err_json.get("error", {}).get("message") or text_body or f"HTTP {resp.status_code}"  
+              _LOGGER.error("Azure responses stream error: %s", msg)  
   
-    # ------------------------------------------------------------------  
-    #  Misc helpers  
-    # ------------------------------------------------------------------  
-    @staticmethod  
-    def _extract_reply(message: Any) -> str:  
-        if message is None:  
-            return ""  
-        if isinstance(message, dict):  
-            content = message.get("content")  
-            if isinstance(content, str):  
-                return content.strip()  
-        content = getattr(message, "content", None)  
-        if isinstance(content, str):  
-            return content.strip()  
-        return ""  
+              # Retry: server impone 2025-03-01-preview (già impostiamo minimo, ma gestiamo comunque)  
+              if (  
+                ("Responses API is enabled only for api-version 2025-03-01-preview" in msg)  
+                and next_version != "2025-03-01-preview"  
+              ):  
+                _LOGGER.debug("Retrying Responses with api-version=2025-03-01-preview")  
+                next_version = "2025-03-01-preview"  
+                res_token_param = None  
+                continue  
   
-    @staticmethod  
-    def _generate_conversation_id() -> str:  
-        try:  
-            return ulid.ulid_now()  
-        except Exception:  
-            return str(uuid.uuid4())  
+              # Retry: cambio parametro token  
+              if "Unsupported parameter: 'max_completion_tokens'" in msg and res_token_param != "max_output_tokens":  
+                _LOGGER.debug("Retrying Responses switching token param to max_output_tokens")  
+                res_token_param = "max_output_tokens"  
+                continue  
+              if "Unsupported parameter: 'max_output_tokens'" in msg and res_token_param != "max_completion_tokens":  
+                _LOGGER.debug("Retrying Responses switching token param to max_completion_tokens")  
+                res_token_param = "max_completion_tokens"  
+                continue  
   
-    # ------------------------------------------------------------------  
-    #  ChatLog creation helper  
-    # ------------------------------------------------------------------  
-    def _create_chat_log(self, conversation_id: str | None):  
-        ChatLogCls = conversation.ChatLog  
-        sig = inspect.signature(ChatLogCls)  
-        kwargs: dict[str, Any] = {}  
-        if "hass" in sig.parameters:  
-            kwargs["hass"] = self.hass  
-        if "conversation_id" in sig.parameters and conversation_id:  
-            kwargs["conversation_id"] = conversation_id  
-        if "continue_conversation" in sig.parameters:  
-            kwargs["continue_conversation"] = False  
-        return ChatLogCls(**kwargs)  # type: ignore[arg-type]  
+              # Se errore e non abbiamo provato l'altro formato, prova "messages"  
+              if not use_messages_format:  
+                _LOGGER.debug("Retrying Responses switching to messages+instructions format")  
+                use_messages_format = True  
+                continue  
   
-    # ------------------------------------------------------------------  
-    #  ConversationEntity basics  
-    # ------------------------------------------------------------------  
-    @property  
-    def supported_languages(self) -> list[str] | Literal["*"]:  
-        return MATCH_ALL  
+              break  
   
-    async def async_added_to_hass(self) -> None:  
-        await super().async_added_to_hass()  
-        conversation.async_set_agent(self.hass, self._entry, self)  
+            # Streaming OK: parser SSE con ricomposizione multiline  
+            last_event: str | None = None  
+            current_event: str | None = None  
+            data_lines: list[str] = []  
+            debug_samples: list[str] = []  
+            debug_limit = self._debug_sse_lines if self._debug_sse else 0  
   
-    async def async_will_remove_from_hass(self) -> None:  
-        conversation.async_unset_agent(self.hass, self._entry)  
-        await super().async_will_remove_from_hass()  
-        if self._client is not None:  
-            if hasattr(self._client, "aclose"):  
-                await self._client.aclose()  # type: ignore[attr-defined]  
-            else:  
-                await self.hass.async_add_executor_job(self._client.close)  
+            async for raw_line in resp.aiter_lines():  
+              if raw_line is None:  
+                continue  
+              line = raw_line.rstrip("\n\r")  
   
-    # ------------------------------------------------------------------  
-    #  NEW API  (_async_handle_message)  
-    # ------------------------------------------------------------------  
-    async def _async_handle_message(  
-        self,  
-        user_input: conversation.ConversationInput,  
-        chat_log: conversation.ChatLog,  
-    ) -> conversation.ConversationResult:  
-        try:  
-            await chat_log.async_update_llm_data(  
-                DOMAIN, user_input, False, self._prompt  
-            )  
-        except conversation.ConverseError as err:  
-            return err.as_conversation_result()  
+              if not line:  
+                # fine messaggio SSE -> processa blocco  
+                if not data_lines:  
+                  continue  
+                data_str = "\n".join(data_lines).strip()  
+                data_lines = []  
+                if debug_limit > 0 and len(debug_samples) < debug_limit:  
+                  debug_samples.append(f"event={current_event or last_event} data={data_str[:500]}")  
+                if not data_str or data_str == "[DONE]":  
+                  break  
+                try:  
+                  payload_obj = json.loads(data_str)  
+                except Exception:  
+                  current_event = None  
+                  continue  
   
-        try:  
-            client = await self._get_client()  
-            extra_body = {_token_param(): self._max_tokens}  
-            messages = await self._build_messages(  
-                user_input.text, chat_log.conversation_id  
-            )  
-            resp = await client.chat.completions.create(  
-                model=self._model,  
-                messages=messages,  
-                temperature=self._temperature,  
-                top_p=self._top_p,  
-                response_format={"type": "text"},  
-                extra_body=extra_body,  
-                timeout=self._api_timeout,  # Aggiunto timeout configurabile  
-            )  
-            reply = self._extract_reply(resp.choices[0].message)  # type: ignore[index]  
-            await self._update_history(  
-                chat_log.conversation_id,  
-                {"role": "user", "content": user_input.text},  
-                {"role": "assistant", "content": reply},  
-            )  
-        except openai.RateLimitError as err:  
-            _LOGGER.error("Rate limited: %s", err)  
-            raise HomeAssistantError("Rate limited or insufficient funds") from err  
-        except openai.APIConnectionError as err:  
-            _LOGGER.error("Connection error with Azure OpenAI: %s", err)  
-            raise HomeAssistantError("Connection error with Azure OpenAI") from err  
-        except openai.OpenAIError as err:  
-            _LOGGER.error("Azure OpenAI error: %s", err)  
-            raise HomeAssistantError("Error talking to Azure OpenAI") from err  
-  
-        # --- add assistant content to ChatLog --------------------------  
-        async def _consume(obj):  
-            if inspect.isasyncgen(obj):  
-                async for _ in obj:  
-                    pass  
-            elif inspect.isawaitable(obj):  
-                await obj  
-  
-        if hasattr(chat_log, "async_add_assistant_content"):  
-            await _consume(  
-                chat_log.async_add_assistant_content(  
-                    self.entity_id, {"role": "assistant", "content": reply}  
+                event_name = (  
+                  payload_obj.get("type")  
+                  or payload_obj.get("event")  
+                  or current_event  
+                  or last_event  
                 )  
-            )  
-        elif hasattr(chat_log, "async_add_delta_content_stream"):  
-            async def _stream():  
-                yield {"role": "assistant"}  
-                yield {"content": reply}  
   
-            await _consume(  
-                chat_log.async_add_delta_content_stream(self.entity_id, _stream())  
-            )  
-        elif hasattr(chat_log, "async_add_content"):  
-            from homeassistant.components.conversation import AssistantContent  
+                def _consume(node: Any) -> None:  
+                  nonlocal text_out  
+                  if node is None:  
+                    return  
+                  if isinstance(node, str):  
+                    text_out += node  
+                    return  
+                  if isinstance(node, list):  
+                    for it in node:  
+                      _consume(it)  
+                    return  
+                  if isinstance(node, dict):  
+                    txt = node.get("text")  
+                    if isinstance(txt, str):  
+                      text_out += txt  
+                    _consume(node.get("content"))  
+                    _consume(node.get("delta"))  
+                    _consume(node.get("data"))  
+                    _consume(node.get("output"))  
   
-            await chat_log.async_add_content(  
-                self.entity_id,  
-                AssistantContent(role="assistant", content=reply),  
-            )  
+                if event_name in ("response.output_text.delta", "output_text.delta"):  
+                  # delta o text al root o in data  
+                  if "delta" in payload_obj or "text" in payload_obj:  
+                    _consume(payload_obj)  
+                  else:  
+                    _consume(payload_obj.get("data"))  
+                elif event_name in (  
+                  "response.delta", "delta",  
+                  "response.message.delta", "message.delta",  
+                  "response.refusal.delta", "refusal.delta",  
+                  "response.output_text",  
+                ):  
+                  _consume(payload_obj.get("delta") or payload_obj)  
+                elif event_name in ("response.error",):  
+                  _LOGGER.error("Azure responses error event: %s", payload_obj)  
+                  break  
+                elif event_name in ("response.completed", "message.completed", "response.finish", "response.output_text.done"):  
+                  break  
   
-        # --- build response object -------------------------------------  
-        if _EXPECTS_AGENT_RSP:  
-            result_response = AgentResponseText(text=reply)  
-        else:  
-            from homeassistant.helpers import intent as intent_mod  # noqa: WPS433  
+                last_event = event_name or last_event  
+                current_event = None  
+                continue  
   
-            intent_resp = intent_mod.IntentResponse(language=user_input.language)  
-            if hasattr(intent_resp, "async_set_speech"):  
-                intent_resp.async_set_speech(reply)  
-            else:  
-                intent_resp.set_speech(reply)  # type: ignore[attr-defined]  
-            result_response = intent_resp  
+              if line.startswith(":"):  
+                continue  
+              if line.startswith("event:"):  
+                current_event = line[6:].strip()  
+                continue  
+              if line.startswith("data:"):  
+                data_lines.append(line[5:].lstrip())  
+                continue  
   
-        return ConversationResult(  
-            response=result_response,  
-            conversation_id=chat_log.conversation_id,  
-            continue_conversation=False,  
+            # Flush finale se rimane un blocco  
+            if data_lines:  
+              data_str = "\n".join(data_lines).strip()  
+              if debug_limit > 0 and len(debug_samples) < debug_limit:  
+                debug_samples.append(f"event={current_event or last_event} data={data_str[:500]}")  
+              try:  
+                payload_obj = json.loads(data_str)  
+              except Exception:  
+                payload_obj = None  
+              if isinstance(payload_obj, dict):  
+                def _consume_tail(node: Any) -> None:  
+                  nonlocal text_out  
+                  if node is None:  
+                    return  
+                  if isinstance(node, str):  
+                    text_out += node  
+                    return  
+                  if isinstance(node, list):  
+                    for it in node:  
+                      _consume_tail(it)  
+                    return  
+                  if isinstance(node, dict):  
+                    txt = node.get("text")  
+                    if isinstance(txt, str):  
+                      text_out += txt  
+                    _consume_tail(node.get("content"))  
+                    _consume_tail(node.get("delta"))  
+                    _consume_tail(node.get("data"))  
+                    _consume_tail(node.get("output"))  
+                _consume_tail(payload_obj)  
+  
+            if debug_samples:  
+              _LOGGER.debug("Responses SSE sample (first %d messages):\n%s", len(debug_samples), "\n".join(debug_samples))  
+  
+            # Se non è uscito testo, prova formato alternativo prima, poi eventualmente fallback  
+            if not text_out and not use_messages_format:  
+              _LOGGER.debug("Responses stream produced no text, retrying with messages+instructions format")  
+              use_messages_format = True  
+              continue  
+  
+            # Fine ciclo Responses  
+            break  
+  
+        # Fallback automatico: se non è arrivato testo, tenta una chiamata NON-streaming Responses  
+        if not text_out:  
+          _LOGGER.debug("Responses stream produced no text; trying non-stream Responses (format=%s)", "messages" if use_messages_format else "input")  
+          text_out = await self._responses_non_stream(messages_chat, sys_msg, next_version, use_messages_format)  
+          # Se ancora vuoto, e modalità 'auto' ma il modello NON è 'o*', si prova Chat  
+          if not text_out and self._force_mode == "auto" and not (self._deployment or "").lower().startswith("o"):  
+            _LOGGER.debug("Responses non-stream produced no text; falling back to Chat Completions")  
+            text_out = await self._chat_completions_fallback(messages_chat)  
+  
+      else:  
+        # Forza Chat immediatamente  
+        text_out = await self._chat_completions_fallback(messages_chat)  
+  
+    except Exception as err:  # noqa: BLE001  
+      _LOGGER.error("Azure streaming failed: %s", err)  
+  
+    # IntentResponse per HA  
+    response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))  
+    response.async_set_speech(text_out or "")  
+  
+    return conversation.ConversationResult(  
+      response=response,  
+      conversation_id=user_input.conversation_id,  
+    )  
+  
+  async def _responses_non_stream(self, messages_chat: list[dict[str, str]], sys_msg: str, api_version: str, use_messages_format: bool) -> str:  
+    """Esegue una chiamata Responses non-stream e restituisce il testo aggregato."""  
+    url = f"{self._endpoint}/openai/responses"  
+  
+    def _to_input(msgs: list[dict[str, str]]) -> list[dict[str, Any]]:  
+      out: list[dict[str, Any]] = []  
+      for m in msgs:  
+        out.append(  
+          {  
+            "role": m["role"],  
+            "content": [{"type": "input_text", "text": m["content"]}],  
+          }  
         )  
+      return out  
   
-    # ------------------------------------------------------------------  
-    #  OLD API (async_process) – compatibility shim  
-    # ------------------------------------------------------------------  
-    async def async_process(  
-        self,  
-        user_input,  
-        context=None,  
-        conversation_id: str | None = None,  
-        language: str | None = None,  
-    ):  
-        if not isinstance(user_input, conversation.ConversationInput):  
-            text = getattr(user_input, "text", str(user_input))  
-            conversation_id = getattr(user_input, "conversation_id", conversation_id)  
-            language = getattr(user_input, "language", language) or "en"  
-            user_input = conversation.ConversationInput(  
-                text=text,  
-                conversation_id=conversation_id,  
-                language=language,  
-                agent_id=self.entity_id,  
-            )  
+    def _responses_token_param_for_version(ver: str) -> str:  
+      y, m, d = self._ver_date_tuple(ver)  
+      return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"  
   
-        if not conversation_id:  
-            conversation_id = self._generate_conversation_id()  
+    token_param = _responses_token_param_for_version(api_version)  
   
-        chat_log = self._create_chat_log(conversation_id)  
-        return await self._async_handle_message(user_input, chat_log)  
+    payload: dict[str, Any] = {  
+      "model": self._deployment,  
+      token_param: int(self._conf.get("max_tokens", 1024)),  
+      "temperature": float(self._conf.get("temperature", 0.7)),  
+      # esplicita modalità testo  
+      "modalities": ["text"],  
+      "text": {"format": "text"},  
+    }  
+    if use_messages_format:  
+      payload["messages"] = _to_input(messages_chat)  
+      payload["instructions"] = sys_msg  
+    else:  
+      payload["input"] = _to_input(messages_chat)  
+  
+    try:  
+      resp = await self._http.post(  
+        url,  
+        params={"api-version": api_version},  
+        headers=self._headers_json,  
+        json=payload,  
+        timeout=self._timeout,  
+      )  
+    except Exception as err:  # noqa: BLE001  
+      _LOGGER.error("Azure responses (non-stream) request failed: %s", err)  
+      return ""  
+  
+    if resp.status_code >= 400:  
+      text_body = await resp.aread()  
+      try:  
+        err_json = json.loads(text_body.decode("utf-8", "ignore") or "{}")  
+      except Exception:  
+        err_json = {}  
+      msg = err_json.get("error", {}).get("message") or text_body.decode("utf-8", "ignore") or f"HTTP {resp.status_code}"  
+      _LOGGER.error("Azure responses (non-stream) error: %s", msg)  
+      return ""  
+  
+    try:  
+      obj = resp.json()  
+    except Exception:  
+      try:  
+        obj = json.loads((await resp.aread()).decode("utf-8", "ignore"))  
+      except Exception:  
+        obj = None  
+  
+    if not isinstance(obj, dict):  
+      return ""  
+  
+    # Estrazione generica di tutto il testo  
+    out = []  
+  
+    def _acc(node: Any) -> None:  
+      if node is None:  
+        return  
+      if isinstance(node, str):  
+        out.append(node)  
+        return  
+      if isinstance(node, list):  
+        for it in node:  
+          _acc(it)  
+        return  
+      if isinstance(node, dict):  
+        txt = node.get("text")  
+        if isinstance(txt, str):  
+          out.append(txt)  
+        _acc(node.get("output"))  
+        _acc(node.get("content"))  
+        _acc(node.get("message"))  
+        _acc(node.get("data"))  
+        _acc(node.get("choices"))  
+  
+    _acc(obj)  
+    text = "".join(out).strip()  
+    _LOGGER.debug("Responses non-stream extracted %d chars", len(text))  
+    return text  
+  
+  async def _chat_completions_fallback(self, messages_chat: list[dict[str, str]]) -> str:  
+    """Esegue Chat Completions (stream) con gestione del parametro token dinamico."""  
+    def _chat_token_param_for_version(ver: str) -> str:  
+      y, m, d = self._ver_date_tuple(ver)  
+      return "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"  
+  
+    text_out = ""  
+    url = f"{self._endpoint}/openai/deployments/{self._deployment}/chat/completions"  
+    next_version = self._api_version  
+    token_param = _chat_token_param_for_version(next_version)  
+    attempted: set[str] = set()  
+  
+    while True:  
+      pair_key = f"{next_version}::{token_param}"  
+      if pair_key in attempted:  
+        break  
+      attempted.add(pair_key)  
+  
+      payload: dict[str, Any] = {  
+        "messages": messages_chat,  
+        "temperature": float(self._conf.get("temperature", 0.7)),  
+        "stream": True,  
+        token_param: int(self._conf.get("max_tokens", 1024)),  
+      }  
+  
+      _LOGGER.debug(  
+        "Calling Chat Completions api-version=%s with token param=%s",  
+        next_version,  
+        token_param,  
+      )  
+  
+      async with self._http.stream(  
+        "POST",  
+        url,  
+        params={"api-version": next_version},  
+        headers=self._headers_sse,  
+        json=payload,  
+        timeout=self._timeout,  
+      ) as resp:  
+        if resp.status_code >= 400:  
+          body = await resp.aread()  
+          txt = body.decode("utf-8", "ignore")  
+          try:  
+            err_json = json.loads(txt or "{}")  
+          except Exception:  
+            err_json = {}  
+          msg = err_json.get("error", {}).get("message") or txt or f"HTTP {resp.status_code}"  
+          _LOGGER.error("Azure chat stream error: %s", msg)  
+  
+          # Retry cambio parametro  
+          if "Unsupported parameter: 'max_tokens'" in msg and token_param != "max_completion_tokens":  
+            _LOGGER.debug("Retrying Chat switching token param to max_completion_tokens")  
+            token_param = "max_completion_tokens"  
+            continue  
+          if "Unsupported parameter: 'max_completion_tokens'" in msg and token_param != "max_tokens":  
+            _LOGGER.debug("Retrying Chat switching token param to max_tokens")  
+            token_param = "max_tokens"  
+            continue  
+  
+          # Retry API version richiesta (caso raro per chat)  
+          if ("api-version 2025-03-01-preview" in msg) and next_version != "2025-03-01-preview":  
+            _LOGGER.debug("Retrying Chat with api-version=2025-03-01-preview")  
+            next_version = "2025-03-01-preview"  
+            token_param = _chat_token_param_for_version(next_version)  
+            continue  
+  
+          break  
+  
+        # Stream OK  
+        async for raw_line in resp.aiter_lines():  
+          if not raw_line:  
+            continue  
+          line = raw_line.strip()  
+          if not line or line.startswith(":"):  
+            continue  
+          if not line.startswith("data:"):  
+            continue  
+  
+          data_str = line[5:].lstrip()  
+          if not data_str or data_str == "[DONE]":  
+            break  
+          try:  
+            chunk = json.loads(data_str)  
+          except Exception:  
+            continue  
+  
+          try:  
+            choices = chunk.get("choices") or []  
+            if not choices:  
+              continue  
+            delta = choices[0].get("delta") or {}  
+            content = delta.get("content")  
+            if content:  
+              text_out += str(content)  
+          except Exception:  
+            continue  
+  
+      break  
+  
+    return text_out  
+  
+  async def async_close(self) -> None:  
+    """Clean up network clients."""  
+    if self._search:  
+      await self._search.close()  
+  
+  
+async def async_setup_entry(  
+  hass: HomeAssistant,  
+  config_entry: ConfigEntry,  
+  async_add_entities: AddEntitiesCallback,  
+) -> None:  
+  """Set up the conversation platform for the Azure OpenAI integration."""  
+  # Mixa data e options per fornire all'agente tutte le opzioni modificabili  
+  conf: dict[str, Any] = {  
+    CONF_API_KEY: config_entry.data[CONF_API_KEY],  
+    # fallback legacy per chiavi principali  
+    "api_base": config_entry.data.get("api_base", ""),  
+    "chat_model": config_entry.data.get("chat_model", ""),  
+    "api_version": config_entry.data.get("api_version"),  
+    **config_entry.options,  
+  }  
+  
+  agent = AzureOpenAIConversationAgent(hass, conf=conf)  
+  conversation.async_set_agent(hass, config_entry, agent)  
