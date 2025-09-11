@@ -1,4 +1,4 @@
-name: Validate HACS
+Pin actions/checkout and actions/setup-python to full commit SHAs for securityname: Validate HACS
 
 on:
   push:

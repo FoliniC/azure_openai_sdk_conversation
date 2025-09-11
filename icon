@@ -1,0 +1,28 @@
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+  "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg width="256" height="256">
+<g style="fill:black;fill-opacity:1;stroke:none;stroke-width:1;stroke-opacity:1;fill-rule:nonzero;<defs>
+<0Gradient id="linear" x1="0" y1="0" x2="256" y2="256">
+  <stop offset="0%" stop-color="#41BDF5" />
+  <stop offset="100%" stop-color="#0D8BC2" />
+</0Gradient>
+</defs>
+">
+<g style="fill:grad1;stroke:#fff;stroke-width:6;">
+  <circle cx="128" cy="128" r="115"/>
+</g>
+<g style="fill:#fff;">
+  <path d="M128 60 C 95 60, 68 87, 68 120 C 68 153, 95 180, 128 180 C 161 180, 188 153, 188 120 C 188 87, 161 60, 128 60 Z"/>
+</g>
+<g style="fill:#41BDF5;">
+  <path d="M108 100 L 128 120 L 148 100 L 128 80 Z"/>
+</g>
+<g style="fill:#41BDF5;">
+  <path d="M108 140 L 128 160 L 148 140 L 128 120 Z"/>
+</g>
+<g style="fill:none;stroke:#41BDF5;stroke-width:4;">
+  <circle cx="128" cy="128" r="30"/>
+</g>
+</g>
+</svg>
