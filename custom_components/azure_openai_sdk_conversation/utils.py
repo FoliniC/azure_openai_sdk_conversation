@@ -1,288 +1,188 @@
-"""Utility helpers for Azure OpenAI SDK Conversation."""  
+"""Utility helpers for API versions and token parameter selection."""  
 from __future__ import annotations  
   
-import asyncio  
-import json  
+from typing import Any  
 import logging  
-import re  
-import time  
-from collections import OrderedDict  
-from datetime import datetime, timedelta  
-from typing import Any, Dict, Optional, Tuple  
   
-import openai  
-from openai import AsyncAzureOpenAI  
-from homeassistant.core import HomeAssistant  
 from homeassistant.helpers.httpx_client import get_async_client  
   
-_LOGGER = logging.getLogger(__name__)  
+from .const import (  
+    RECOMMENDED_MAX_TOKENS,  
+    RECOMMENDED_REASONING_EFFORT,  
+    RECOMMENDED_TEMPERATURE,  
+    RECOMMENDED_TOP_P,  
+    RECOMMENDED_API_TIMEOUT,  
+    RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+)  
   
   
-# ---------------------------------------------------------------------------  
-#  Small generic LRU cache with TTL – simple & dependency-free  
-# ---------------------------------------------------------------------------  
-class _LRUTTL(OrderedDict):  
-  """Very small LRU-cache with TTL."""  
-  
-  def __init__(self, maxlen: int = 32, ttl: int = 3600) -> None:  
-    super().__init__()  
-    self._maxlen = maxlen  
-    self._ttl = ttl  
-  
-  def get(self, key: str) -> Any | None:  # noqa: D401  
-    item = super().get(key)  
-    if not item:  
-      return None  
-    value, ts = item  
-    if time.time() - ts > self._ttl:  
-      super().__delitem__(key)  
-      return None  
-    # refresh ordering  
-    super().__delitem__(key)  
-    super().__setitem__(key, (value, ts))  
-    return value  
-  
-  def set(self, key: str, value: Any) -> None:  
-    if key in self:  
-      super().__delitem__(key)  
-    elif len(self) >= self._maxlen:  
-      self.popitem(last=False)  
-    super().__setitem__(key, (value, time.time()))  
-  
-  
-_CAPS_CACHE: _LRUTTL = _LRUTTL(maxlen=64, ttl=4 * 3600)  # 4 h cache  
-  
-  
-# ---------------------------------------------------------------------------  
-#  API-VERSION MANAGER  
-# ---------------------------------------------------------------------------  
 class APIVersionManager:  
-  """Gestisce versioni note, estrazione da errori e mapping token-param."""  
+    """Gestione versioni API e raccomandazioni per modello."""  
   
-  _RE_VERSION = re.compile(r"(\d{4}-\d{2}-\d{2}(?:-preview)?)")  
-  
-  # Ordine d'inserimento conta per best_for_model: prima la più recente consigliata  
-  _KNOWN: dict[str, dict[str, Any]] = {  
-    "2025-03-01-preview": {  
-      "supports_o1": True,  
-      "supports_web_search": True,  
-      "token_param": "max_completion_tokens",  
-      "since": datetime(2025, 3, 1),  
-    },  
-    "2025-01-01-preview": {  
-      "supports_o1": True,  
-      "supports_web_search": True,  
-      "token_param": "max_completion_tokens",  
-      "since": datetime(2025, 1, 1),  
-    },  
-    "2024-12-01-preview": {  
-      "supports_o1": True,  
-      "supports_web_search": False,  
-      "token_param": "max_tokens",  
-      "since": datetime(2024, 12, 1),  
-    },  
-    "2024-10-01-preview": {  
-      "supports_o1": False,  
-      "supports_web_search": False,  
-      "token_param": "max_tokens",  
-      "since": datetime(2024, 10, 1),  
-    },  
-    "2024-08-06": {  
-      "supports_o1": False,  
-      "supports_web_search": True,  
-      "token_param": "max_tokens",  
-      "since": datetime(2024, 8, 6),  
-    },  
-  }  
-  
-  @classmethod  
-  def extract_version_from_error(cls, msg: str | None) -> str | None:  
-    if not msg:  
-      return None  
-    found = cls._RE_VERSION.search(msg)  
-    return found.group(1) if found else None  
-  
-  @classmethod  
-  def best_for_model(cls, model: str) -> str:  
-    # Preferisci la più recente che supporta "o*" (o1, o3, ...)  
-    if model.lower().startswith("o"):  
-      for ver, info in cls._KNOWN.items():  
-        if info.get("supports_o1"):  
-          return ver  
-    # Default consigliato  
-    return "2025-03-01-preview"  
-  
-  @classmethod  
-  def token_param(cls, api_version: str) -> str:  
-    return cls._KNOWN.get(api_version, {}).get("token_param", "max_tokens")  
-  
-  
-# ---------------------------------------------------------------------------  
-#  LOGGER  
-# ---------------------------------------------------------------------------  
-class AzureOpenAILogger:  
-  """Logger con sanitizzazione automatica dei dati sensibili."""  
-  
-  _SENSITIVE = ("key", "token", "authorization", "secret", "password")  
-  
-  def __init__(self, name: str) -> None:  
-    self._log = logging.getLogger(name)  
-  
-  # --- sanitisation helpers -------------------------------------------------  
-  def _clean(self, obj: Any) -> Any:  
-    if isinstance(obj, dict):  
-      return {  
-        k: "***" if any(s in k.lower() for s in self._SENSITIVE) else self._clean(v)  
-        for k, v in obj.items()  
-      }  
-    if isinstance(obj, list):  
-      return [self._clean(it) for it in obj]  
-    return obj  
-  
-  # --- public logging helpers ----------------------------------------------  
-  def debug_api(self, method: str, endpoint: str, params: dict[str, Any]) -> None:  
-    self._log.debug("API %s %s – params=%s", method, endpoint, self._clean(params))  
-  
-  def debug_resp(self, status: int, data: Any) -> None:  
-    self._log.debug("API RESP %s – %s", status, str(self._clean(data))[:500])  
-  
-  def error(self, err: Exception, ctx: dict[str, Any] | None = None) -> None:  
-    self._log.error("%s – ctx=%s", err, self._clean(ctx or {}))  
-  
-  
-# ---------------------------------------------------------------------------  
-#  VALIDATOR  (retry automatico + gestione errors)  
-# ---------------------------------------------------------------------------  
-class AzureOpenAIValidator:  
-  """Convalida credenziali/deployment provando versioni & token-param diversi."""  
-  
-  _RETRY_BACKOFF = (0.2, 0.5, 1.0)  # sec  
-  
-  def __init__(  
-    self,  
-    hass: HomeAssistant,  
-    api_key: str,  
-    api_base: str,  
-    deployment: str,  
-    logger: AzureOpenAILogger | None = None,  
-  ) -> None:  
-    from . import normalize_azure_endpoint  
-  
-    self._hass = hass  
-    self._api_key = api_key  
-    self._endpoint = normalize_azure_endpoint(api_base).rstrip("/").removesuffix("/openai")  
-    self._deployment = deployment  
-    self._log = logger or AzureOpenAILogger(__name__)  
-    self._successful: dict[str, Any] | None = None  
-  
-  # ------------------------------------------------------------------ helpers  
-  async def _probe(  
-    self,  
-    api_version: str,  
-    token_param: str,  
-  ) -> bool:  
-    client = AsyncAzureOpenAI(  
-      api_key=self._api_key,  
-      api_version=api_version,  
-      azure_endpoint=self._endpoint,  
-      http_client=get_async_client(self._hass),  
-    )  
-    payload = {  
-      "model": self._deployment,  
-      "messages": [  
-        {"role": "system", "content": "ping"},  
-        {"role": "user", "content": "ping"},  
-      ],  
-      token_param: 10,  
+    # Mappa version -> metadata con 'since' come tuple(year, month, day)  
+    _KNOWN: dict[str, dict[str, Any]] = {  
+        # Esempi comuni (aggiungi/rimuovi in base alle tue necessità)  
+        "2024-10-01-preview": {"since": (2024, 10, 1)},  
+        "2025-01-01-preview": {"since": (2025, 1, 1)},  
+        "2025-03-01-preview": {  
+            "since": (2025, 3, 1),  
+            "responses_min": True,  # Responses API ufficiale da qui in poi  
+        },  
     }  
-    self._log.debug_api("POST", "/chat/completions", {"ver": api_version, **payload})  
-    await client.chat.completions.create(**payload)  # noqa: S101  
-    return True  
   
-  # ------------------------------------------------------------------ public  
-  async def validate(self, initial_version: str | None = None) -> dict[str, Any]:  
-    versions: list[str] = []  
-    if initial_version:  
-      versions.append(initial_version)  
-    best = APIVersionManager.best_for_model(self._deployment)  
-    if best not in versions:  
-      versions.append(best)  
-    versions.extend([v for v in APIVersionManager._KNOWN if v not in versions])  
-  
-    last_exc: Exception | None = None  
-  
-    for api_version in versions:  
-      for token_param in (  
-        APIVersionManager.token_param(api_version),  
-        "max_completion_tokens",  
-        "max_tokens",  
-      ):  
+    @classmethod  
+    def _date_tuple(cls, ver: str) -> tuple[int, int, int]:  
+        core = (ver or "").split("-preview")[0]  
+        parts = core.split("-")  
         try:  
-          await self._probe(api_version, token_param)  
-          self._successful = {  
-            "api_version": api_version,  
-            "token_param": token_param,  
-          }  
-          return self._successful  
-        except openai.BadRequestError as err:  
-          # prova a estrarre versione suggerita  
-          suggested = APIVersionManager.extract_version_from_error(str(err))  
-          if suggested and suggested not in versions:  
-            versions.insert(0, suggested)  
-          last_exc = err  
-        except openai.AuthenticationError as err:  
-          raise  # irrecoverable  
-        except Exception as err:  # pylint: disable=broad-except  
-          last_exc = err  
-      await asyncio.sleep(self._RETRY_BACKOFF[min(len(self._RETRY_BACKOFF) - 1, versions.index(api_version))])  
+            return (int(parts[0]), int(parts[1]), int(parts[2]))  
+        except Exception:  # noqa: BLE001  
+            return (1900, 1, 1)  
   
-    raise last_exc or RuntimeError("Unable to validate credentials")  
+    @classmethod  
+    def known_versions(cls) -> list[str]:  
+        """Lista ordinata per 'since' ascendente, deterministica."""  
+        return sorted(  
+            cls._KNOWN.keys(),  
+            key=lambda v: cls._KNOWN.get(v, {}).get("since", cls._date_tuple(v)),  
+        )  
   
-  # ---------------------------------------------------------------- capabilities  
-  async def capabilities(self) -> dict[str, dict[str, Any]]:  
-    if not self._successful:  
-      raise RuntimeError("validate() not executed")  
+    @classmethod  
+    def ensure_min(cls, ver: str, minimum: str) -> str:  
+        """Ritorna 'ver' se >= minimum, altrimenti 'minimum'."""  
+        v = cls._date_tuple(ver)  
+        m = cls._date_tuple(minimum)  
+        return ver if v >= m else minimum  
   
-    cache_key = f"{self._endpoint}:{self._deployment}:{self._successful['api_version']}"  
-    if (caps := _CAPS_CACHE.get(cache_key)) is not None:  
-      return caps  
+    @classmethod  
+    def best_for_model(cls, model: str | None, fallback: str | None = None) -> str:  
+        """  
+        Seleziona versione consigliata in modo deterministico:  
+        - per modelli 'o*' forza almeno 2025-03-01-preview (Responses),  
+        - altrimenti usa l'ultima nota (ordinata per 'since') o fallback.  
+        """  
+        m = (model or "").strip().lower()  
+        if m.startswith("o"):  
+            if "2025-03-01-preview" in cls._KNOWN:  
+                return "2025-03-01-preview"  
+        # Non 'o*': scegli l'ultima versione conosciuta  
+        versions = cls.known_versions()  
+        if versions:  
+            return versions[-1]  
+        return fallback or "2025-01-01-preview"  
   
-    client = AsyncAzureOpenAI(  
-      api_key=self._api_key,  
-      api_version=self._successful["api_version"],  
-      azure_endpoint=self._endpoint,  
-      http_client=get_async_client(self._hass),  
-    )  
-    items = []  
-    try:  
-      if hasattr(client, "deployments"):  
-        resp = await client.deployments.list()  
-      else:  
-        resp = await client.models.list()  
-      items = getattr(resp, "data", [])  
-    except Exception as err:  # pylint: disable=broad-except  
-      self._log.error(err, {"stage": "caps"})  
   
-    params: dict[str, dict[str, Any]] = {}  
-    for obj in items:  
-      if obj.id != self._deployment:  
-        continue  
-      caps = getattr(obj, "capabilities", None)  
-      if not caps:  
-        break  
-      sampling = getattr(caps, "sampling_parameters", None)  
-      if not sampling:  
-        break  
-      for itm in sampling:  
-        name = itm.get("name")  
-        if name:  
-          params[name] = {  
-            "default": itm.get("default"),  
-            "min": itm.get("minimum"),  
-            "max": itm.get("maximum"),  
-            "step": itm.get("step"),  
-          }  
-      break  
+class TokenParamHelper:  
+    """Selettore del parametro token in base alla api-version."""  
   
-    _CAPS_CACHE.set(cache_key, params)  
-    return params  
+    @staticmethod  
+    def responses_token_param_for_version(ver: str) -> str:  
+        """Responses: da 2025-03-01-preview => max_output_tokens, altrimenti max_completion_tokens."""  
+        y, m, d = APIVersionManager._date_tuple(ver)  
+        return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"  
+  
+    @staticmethod  
+    def chat_token_param_for_version(ver: str) -> str:  
+        """Chat: da 2025-01-01-preview => max_completion_tokens, altrimenti max_tokens."""  
+        y, m, d = APIVersionManager._date_tuple(ver)  
+        return "max_completion_tokens" if (y, m, d) >= (2025, 1, 1) else "max_tokens"  
+  
+  
+def redact_api_key(value: str | None) -> str:  
+    """Oscura una API key in log/UI, lasciando visibili solo i primi/ultimi 3 char."""  
+    if not value:  
+        return ""  
+    val = str(value)  
+    if len(val) <= 8:  
+        return "*" * len(val)  
+    return f"{val[:3]}***{val[-3:]}"  
+  
+  
+class AzureOpenAILogger:  
+    """Sottile wrapper per il logger, compatibile con l'uso nel validator."""  
+  
+    def __init__(self, name: str) -> None:  
+        self._log = logging.getLogger(name)  
+  
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:  
+        self._log.debug(msg, *args, **kwargs)  
+  
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:  
+        self._log.info(msg, *args, **kwargs)  
+  
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:  
+        self._log.warning(msg, *args, **kwargs)  
+  
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:  
+        self._log.error(msg, *args, **kwargs)  
+  
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:  
+        self._log.exception(msg, *args, **kwargs)  
+  
+  
+class AzureOpenAIValidator:  
+    """  
+    Validator per Step 1 del config flow:  
+    - verifica credenziali chiamando /openai/models,  
+    - determina api_version effettiva e token_param coerenti con il modello.  
+    """  
+  
+    def __init__(self, hass: Any, api_key: str, api_base: str, chat_model: str, log: AzureOpenAILogger) -> None:  
+        self._hass = hass  
+        self._api_key = (api_key or "").strip()  
+        self._api_base = (api_base or "").rstrip("/")  
+        self._model = (chat_model or "").strip()  
+        self._log = log  
+  
+    async def validate(self, api_version: str | None) -> dict[str, Any]:  
+        """Ritorna {'api_version': str, 'token_param': str} o solleva un'eccezione con messaggi utili alla UI."""  
+        # Normalizza api-version consigliata  
+        requested_version = (api_version or "").strip() or APIVersionManager.best_for_model(self._model)  
+        use_responses = self._model.lower().startswith("o")  
+        effective_version = APIVersionManager.ensure_min(requested_version, "2025-03-01-preview") if use_responses else requested_version  
+  
+        base = self._api_base  
+        if "://" not in base:  
+            base = f"https://{base}"  
+        url = f"{base}/openai/models"  
+  
+        http = get_async_client(self._hass)  
+        headers = {"api-key": self._api_key, "Accept": "application/json"}  
+  
+        self._log.debug("Validating Azure OpenAI credentials at %s (api-version=%s)", base, effective_version)  
+        try:  
+            resp = await http.get(url, params={"api-version": effective_version}, headers=headers, timeout=10)  
+        except Exception as err:  # noqa: BLE001  
+            raise Exception(f"cannot_connect: {err}") from err  
+  
+        if resp.status_code in (401, 403):  
+            raise Exception("invalid_auth: unauthorized/forbidden (401/403)")  
+        if resp.status_code == 404:  
+            text = (await resp.aread()).decode("utf-8", "ignore")  
+            raise Exception(f"invalid_deployment or not found (404): {text}")  
+        if resp.status_code >= 400:  
+            text = (await resp.aread()).decode("utf-8", "ignore")  
+            raise Exception(f"unknown: HTTP {resp.status_code}: {text}")  
+  
+        token_param = (  
+            TokenParamHelper.responses_token_param_for_version(effective_version)  
+            if use_responses  
+            else TokenParamHelper.chat_token_param_for_version(effective_version)  
+        )  
+        return {"api_version": effective_version, "token_param": token_param}  
+  
+    async def capabilities(self) -> dict[str, dict[str, Any]]:  
+        """  
+        Ritorna metadati per il secondo step (campi dinamici).  
+        Valori di default allineati alle costanti RECOMMENDED_*; range generici sicuri.  
+        """  
+        caps: dict[str, dict[str, Any]] = {  
+            "temperature": {"default": RECOMMENDED_TEMPERATURE, "min": 0.0, "max": 2.0, "step": 0.05},  
+            "top_p": {"default": RECOMMENDED_TOP_P, "min": 0.0, "max": 1.0, "step": 0.01},  
+            "max_tokens": {"default": RECOMMENDED_MAX_TOKENS, "min": 1, "max": 8192, "step": 1},  
+            "reasoning_effort": {"default": RECOMMENDED_REASONING_EFFORT},  
+            "api_timeout": {"default": RECOMMENDED_API_TIMEOUT, "min": 5, "max": 120, "step": 1},  
+            "exposed_entities_limit": {"default": RECOMMENDED_EXPOSED_ENTITIES_LIMIT, "min": 50, "max": 2000, "step": 10},  
+        }  
+        # Nota: puoi espandere con altri campi specifici in futuro.  
+        return caps  

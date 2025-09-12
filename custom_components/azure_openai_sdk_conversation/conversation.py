@@ -6,6 +6,7 @@ import json
 import logging  
 import re  
   
+from homeassistant.helpers import llm  
 from homeassistant.components import conversation  
 from homeassistant.components.conversation import AbstractConversationAgent, ConversationInput  
 from homeassistant.config_entries import ConfigEntry  
@@ -163,7 +164,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
     # 1) Prova render Jinja con HATemplate (azure + exposed_entities)  
     try:  
       tmpl = HATemplate(raw_sys_msg, hass=self._hass)  
-      sys_msg = await tmpl.async_render(  
+      sys_msg = tmpl.async_render(    
         {  
           "azure": azure_ctx,  
           "exposed_entities": self._collect_exposed_entities(),  
@@ -754,5 +755,26 @@ async def async_setup_entry(
     **config_entry.options,  
   }  
   
+  # Normalizza il system prompt  
+  sys_prompt = (  
+    conf.get("system_message")  
+    or conf.get("system_prompt")  
+    or conf.get("prompt")  
+    or llm.DEFAULT_INSTRUCTIONS_PROMPT  
+  )  
+  conf["system_message"] = sys_prompt  
+  
   agent = AzureOpenAIConversationAgent(hass, conf=conf)  
-  conversation.async_set_agent(hass, config_entry, agent)  
+  
+  # Compat con diverse versioni dell’API conversation  
+  try:  
+    conversation.async_set_agent(hass, config_entry, agent)  
+  except TypeError:  
+    try:  
+      conversation.async_set_agent(hass, agent)  # firma più vecchia  
+    except TypeError:  
+      conversation.async_register_agent(  
+        hass,  
+        agent_id=f"{DOMAIN}.{config_entry.entry_id}",  
+        agent=agent,  
+      )  

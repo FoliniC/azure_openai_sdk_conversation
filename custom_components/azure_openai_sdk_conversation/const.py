@@ -1,59 +1,115 @@
-"""Constants for Azure OpenAI SDK Conversation integration."""  
+"""Costanti per l'integrazione Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
-import logging
-
-# Logger
-LOGGER = logging.getLogger(__name__)
-
-# Integration domain  
-DOMAIN = "azure_openai_sdk_conversation"  
+from typing import Final, List  
+from homeassistant.const import Platform  
   
-# Configuration keys  
-CONF_API_BASE = "api_base"  
-CONF_API_KEY = "api_key"  
-CONF_CHAT_MODEL = "chat_model"  
-CONF_MAX_TOKENS = "max_tokens"  
-CONF_PROMPT = "prompt"  
-CONF_REASONING_EFFORT = "reasoning_effort"  
-CONF_RECOMMENDED = "recommended"  
-CONF_TEMPERATURE = "temperature"  
-CONF_TOP_P = "top_p"  
-CONF_WEB_SEARCH = "web_search"  
-CONF_WEB_SEARCH_CITY = "web_search_city"  
-CONF_WEB_SEARCH_CONTEXT_SIZE = "web_search_context_size"  
-CONF_WEB_SEARCH_COUNTRY = "web_search_country"  
-CONF_WEB_SEARCH_REGION = "web_search_region"  
-CONF_WEB_SEARCH_TIMEZONE = "web_search_timezone"  
-CONF_WEB_SEARCH_USER_LOCATION = "web_search_user_location"  
-CONF_API_TIMEOUT = "api_timeout"  
-CONF_API_VERSION = "api_version"  
-CONF_FILENAMES = "filenames"  
+# Dominio dell'integrazione  
+DOMAIN: Final[str] = "azure_openai_sdk_conversation"  
   
-# Recommended values for configuration options  
-RECOMMENDED_CHAT_MODEL = "o1"  
-RECOMMENDED_MAX_TOKENS = 300  
-RECOMMENDED_REASONING_EFFORT = "medium"  
-RECOMMENDED_TEMPERATURE = 1.0  
-RECOMMENDED_TOP_P = 1.0  
-RECOMMENDED_WEB_SEARCH = False  
-RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE = "medium"  
-RECOMMENDED_WEB_SEARCH_USER_LOCATION = True  
-RECOMMENDED_API_TIMEOUT = 30  
+# Piattaforme supportate  
+PLATFORMS: Final[List[Platform]] = [Platform.CONVERSATION]  
   
-# Models with specific capabilities or restrictions  
-UNSUPPORTED_MODELS = frozenset(  
-    {  
-        "gpt-4o-realtime-preview",  
-        "gpt-4o-realtime-preview-2024-10-01",  
-    }  
+# Chiavi di configurazione (schema/entry) - convenzione CONF_*  
+CONF_API_BASE: Final[str] = "api_base"            # Es: https://<resource>.openai.azure.com  
+CONF_API_KEY: Final[str] = "api_key"  
+CONF_CHAT_MODEL: Final[str] = "chat_model"        # Nome deployment (Azure) o model  
+CONF_DEPLOYMENT: Final[str] = CONF_CHAT_MODEL     # Alias usato in alcune versioni del flow  
+CONF_API_VERSION: Final[str] = "api_version"      # Es: 2025-01-01-preview / 2025-03-01-preview  
+CONF_TOKEN_PARAM: Final[str] = "token_param"      # max_tokens / max_completion_tokens / max_output_tokens  
+CONF_SYSTEM_PROMPT: Final[str] = "system_prompt"  
+CONF_PROMPT: Final[str] = "prompt"                # Alias richiesto dal config_flow (backcompat)  
+  
+# Parametri modello come CONF_* (usati in config_flow/options_flow)  
+CONF_TEMPERATURE: Final[str] = "temperature"  
+CONF_TOP_P: Final[str] = "top_p"  
+CONF_MAX_TOKENS: Final[str] = "max_tokens"  
+CONF_API_TIMEOUT: Final[str] = "api_timeout"  
+CONF_REASONING_EFFORT: Final[str] = "reasoning_effort"  
+CONF_EXPOSED_ENTITIES_LIMIT: Final[str] = "exposed_entities_limit"  
+  
+# Impostazioni di ricerca web (se supportate dal flow/options)  
+CONF_WEB_SEARCH: Final[str] = "web_search"  
+CONF_WEB_SEARCH_CONTEXT_SIZE: Final[str] = "web_search_context_size"  
+CONF_WEB_SEARCH_USER_LOCATION: Final[str] = "web_search_user_location"  
+  
+# Flag per UI/flow (es. schema "preset consigliato")  
+CONF_RECOMMENDED: Final[str] = "recommended"  
+  
+# Alias per opzioni (backcompat con versioni precedenti che usano OPT_*)  
+OPT_TEMPERATURE: Final[str] = CONF_TEMPERATURE  
+OPT_TOP_P: Final[str] = CONF_TOP_P  
+OPT_MAX_TOKENS: Final[str] = CONF_MAX_TOKENS  
+OPT_API_TIMEOUT: Final[str] = CONF_API_TIMEOUT  
+OPT_REASONING_EFFORT: Final[str] = CONF_REASONING_EFFORT  
+OPT_EXPOSED_ENTITIES_LIMIT: Final[str] = CONF_EXPOSED_ENTITIES_LIMIT  
+  
+# Prompt di sistema di default (puoi personalizzarlo nelle opzioni dell'entry)  
+DEFAULT_SYSTEM_PROMPT: Final[str] = (  
+    "Sei un assistente conversazionale integrato in Home Assistant. "  
+    "Rispondi in modo conciso e utile nella lingua dell'utente: {{ user_language }}. "  
+    "Nome della casa: {{ name }}. "  
+    "Istruzioni:\n"  
+    "- Non inventare entità o stati che non conosci.\n"  
+    "- Se non hai abbastanza contesto, chiedi una breve chiarificazione.\n"  
+    "- Se la richiesta non riguarda la casa, rispondi comunque in modo utile e sintetico.\n\n"  
+    "Messaggio utente: {{ user_text }}"  
 )  
-WEB_SEARCH_MODELS = frozenset(  
-    {  
-        "gpt-4o",  
-        "gpt-4o-2024-05-13",  
-        "gpt-4o-2024-08-06",  
-        "gpt-4o-mini",  
-        "gpt-4o-mini-2024-07-18",  
-    }  
-)  
+  
+# Valori raccomandati per i parametri modello e opzioni  
+RECOMMENDED_CHAT_MODEL: Final[str] = "gpt-4o-mini"          # Deployment consigliato di default  
+RECOMMENDED_TEMPERATURE: Final[float] = 0.7  
+RECOMMENDED_TOP_P: Final[float] = 1.0  
+RECOMMENDED_MAX_TOKENS: Final[int] = 512  
+RECOMMENDED_API_TIMEOUT: Final[int] = 30  
+RECOMMENDED_REASONING_EFFORT: Final[str] = "medium"         # per modelli 'o*' (o1, o3, ecc.)  
+RECOMMENDED_EXPOSED_ENTITIES_LIMIT: Final[int] = 500  
+  
+# Raccomandazioni per ricerca web (se abilitata dall'integrazione)  
+RECOMMENDED_WEB_SEARCH: Final[bool] = False  
+RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE: Final[int] = 2000  
+RECOMMENDED_WEB_SEARCH_USER_LOCATION: Final[bool] = False  
+  
+__all__ = [  
+    # Domain / platforms  
+    "DOMAIN",  
+    "PLATFORMS",  
+    # Config keys (CONF_*)  
+    "CONF_API_BASE",  
+    "CONF_API_KEY",  
+    "CONF_CHAT_MODEL",  
+    "CONF_DEPLOYMENT",  
+    "CONF_API_VERSION",  
+    "CONF_TOKEN_PARAM",  
+    "CONF_SYSTEM_PROMPT",  
+    "CONF_PROMPT",  
+    "CONF_TEMPERATURE",  
+    "CONF_TOP_P",  
+    "CONF_MAX_TOKENS",  
+    "CONF_API_TIMEOUT",  
+    "CONF_REASONING_EFFORT",  
+    "CONF_EXPOSED_ENTITIES_LIMIT",  
+    "CONF_WEB_SEARCH",  
+    "CONF_WEB_SEARCH_CONTEXT_SIZE",  
+    "CONF_WEB_SEARCH_USER_LOCATION",  
+    "CONF_RECOMMENDED",  
+    # Option aliases (OPT_*)  
+    "OPT_TEMPERATURE",  
+    "OPT_TOP_P",  
+    "OPT_MAX_TOKENS",  
+    "OPT_API_TIMEOUT",  
+    "OPT_REASONING_EFFORT",  
+    "OPT_EXPOSED_ENTITIES_LIMIT",  
+    # Defaults / recommendations  
+    "DEFAULT_SYSTEM_PROMPT",  
+    "RECOMMENDED_CHAT_MODEL",  
+    "RECOMMENDED_TEMPERATURE",  
+    "RECOMMENDED_TOP_P",  
+    "RECOMMENDED_MAX_TOKENS",  
+    "RECOMMENDED_API_TIMEOUT",  
+    "RECOMMENDED_REASONING_EFFORT",  
+    "RECOMMENDED_EXPOSED_ENTITIES_LIMIT",  
+    "RECOMMENDED_WEB_SEARCH",  
+    "RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE",  
+    "RECOMMENDED_WEB_SEARCH_USER_LOCATION",  
+]  

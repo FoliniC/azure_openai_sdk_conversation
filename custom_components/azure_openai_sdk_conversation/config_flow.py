@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging  
 from typing import Any, Mapping  
   
-import openai  
 import voluptuous as vol  
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow  
 from homeassistant.const import CONF_API_KEY  
@@ -36,6 +35,7 @@ from .const import (
   CONF_WEB_SEARCH,  
   CONF_WEB_SEARCH_CONTEXT_SIZE,  
   CONF_WEB_SEARCH_USER_LOCATION,  
+  CONF_EXPOSED_ENTITIES_LIMIT,  
   DOMAIN,  
   RECOMMENDED_CHAT_MODEL,  
   RECOMMENDED_MAX_TOKENS,  
@@ -45,6 +45,7 @@ from .const import (
   RECOMMENDED_WEB_SEARCH,  
   RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
   RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
+  RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
 )  
 from .utils import APIVersionManager, AzureOpenAILogger, AzureOpenAIValidator  
   
@@ -97,15 +98,18 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
     try:  
       self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])  
       self._sampling_caps = await validator.capabilities()  
-    except openai.AuthenticationError:  
-      errors["base"] = "invalid_auth"  
-    except openai.NotFoundError:  
-      errors["base"] = "invalid_deployment"  
-    except openai.APIConnectionError:  
-      errors["base"] = "cannot_connect"  
     except Exception as err:  # pylint: disable=broad-except  
       _LOGGER.exception("Validation failed: %s", err)  
-      errors["base"] = "unknown"  
+      # Heuristica di mapping semplice per UI  
+      emsg = str(err).lower()  
+      if "401" in emsg or "forbidden" in emsg or "unauthorized" in emsg or "invalid api key" in emsg:  
+        errors["base"] = "invalid_auth"  
+      elif "not found" in emsg or "deployment" in emsg or "404" in emsg:  
+        errors["base"] = "invalid_deployment"  
+      elif "timeout" in emsg or "connect" in emsg or "network" in emsg:  
+        errors["base"] = "cannot_connect"  
+      else:  
+        errors["base"] = "unknown"  
   
     if errors:  
       return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)  
@@ -115,6 +119,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
   # ------------------------------------------------------------------ STEP 2  
   async def async_step_params(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
     assert self._step1_data is not None  
+  
     cap_schema: VolDictType = {}  
   
     # build dynamic schema from capabilities  
@@ -154,10 +159,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             cleaned[fld] = val  
       if not errors:  
         return self._create_entry(options=cleaned)  
+      return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema), errors=errors)  
   
-    return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema), errors=errors)  
-  
-  # ---------------------------------------------------------------- create  
+    # ---------------------------------------------------------------- create  
   def _create_entry(self, *, options: Mapping[str, Any]) -> ConfigFlowResult:  
     assert self._step1_data is not None  
     assert self._validated is not None  
@@ -175,6 +179,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
       CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,  
       "token_param": self._validated["token_param"],  
       CONF_API_VERSION: self._validated["api_version"],  
+      CONF_EXPOSED_ENTITIES_LIMIT: RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
     }  
     base_opts.update(options)  
   

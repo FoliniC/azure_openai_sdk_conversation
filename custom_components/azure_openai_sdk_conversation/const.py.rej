@@ -1,0 +1,15 @@
+--- azure_openai_sdk_conversation/const.py  
++++ azure_openai_sdk_conversation/const.py  
+@@ -1,8 +1,10 @@  
+ """Constants for Azure OpenAI SDK Conversation integration."""  
+ from __future__ import annotations  
+   
+ import logging  
+-# LoggerLOGGER = logging.getLogger(__name__)  
+-# Integration domain  DOMAIN = "azure_openai_sdk_conversation"  
++# Logger  
++LOGGER = logging.getLogger(__name__)  
++# Integration domain  
++DOMAIN = "azure_openai_sdk_conversation"  
+   
+ # Configuration keys  

@@ -56,10 +56,10 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
     data = dict(self._entry.data)  
   
     # Opzioni per api_version e conversation_api_version  
-    versions = list(getattr(APIVersionManager, "_KNOWN", {}) or {})  
+    versions = APIVersionManager.known_versions()  
     if "2025-03-01-preview" not in versions:  
       versions.append("2025-03-01-preview")  
-    versions = sorted(versions)  
+      versions = sorted(versions)  
   
     api_ver_options = [SelectOptionDict(label=v, value=v) for v in versions]  
   
@@ -180,11 +180,19 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
         else:  
           new_options[key] = user_input[key]  
   
-    # conversation_api_version con sentinel  
+    # conversation_api_version con sentinel + validazione  
     sel = user_input.get(CONF_CONV_API_VERSION, _SENTINEL_SAME)  
     if sel == _SENTINEL_SAME:  
       new_options.pop(CONF_CONV_API_VERSION, None)  
     else:  
+      allowed = set(APIVersionManager.known_versions())  
+      if sel not in allowed:  
+        # Mostra form con errore specifico sul campo  
+        return self.async_show_form(  
+          step_id="init",  
+          data_schema=schema,  
+          errors={CONF_CONV_API_VERSION: "invalid_option"},  
+        )  
       new_options[CONF_CONV_API_VERSION] = sel  
   
     return self.async_create_entry(title="", data=new_options)  

@@ -1,0 +1,849 @@
+"""Config flow for Azure OpenAI SDK Conversation."""  
+from __future__ import annotations  
+  
+import json  
+import logging  
+from collections.abc import Mapping  
+from types import MappingProxyType  
+from typing import Any, Dict, Tuple  
+  
+import openai  
+from openai import AsyncAzureOpenAI  
+import voluptuous as vol  
+  
+# voluptuous_openapi non è più nel core di Home Assistant: rendilo facoltativo  
+try:  
+    from voluptuous_openapi import convert  
+except ImportError:  # pragma: no cover  
+    def convert(schema):  # type: ignore  
+        return {}  
+  
+  
+from homeassistant.components.zone import ENTITY_ID_HOME  
+from homeassistant.config_entries import (  
+    ConfigEntry,  
+    ConfigFlow,  
+    ConfigFlowResult,  
+    OptionsFlow,  
+)  
+from homeassistant.const import ATTR_LATITUDE, ATTR_LONGITUDE, CONF_API_KEY  
+# CONF_LLM_HASS_API esiste solo da HA 2024.10 in poi  
+try:  
+    from homeassistant.const import CONF_LLM_HASS_API  # type: ignore  
+except ImportError:  # pragma: no cover  
+    CONF_LLM_HASS_API = "llm_hass_api"  # type: ignore  
+  
+from homeassistant.core import HomeAssistant  
+from homeassistant.helpers import llm  
+from homeassistant.helpers.httpx_client import get_async_client  
+from homeassistant.helpers.selector import (  
+    NumberSelector,  
+    NumberSelectorConfig,  
+    SelectOptionDict,  
+    SelectSelector,  
+    SelectSelectorConfig,  
+    SelectSelectorMode,  
+    TemplateSelector,  
+)  
+from homeassistant.helpers.typing import VolDictType  
+  
+from .const import (  
+    CONF_API_BASE,  
+    CONF_CHAT_MODEL,  
+    CONF_MAX_TOKENS,  
+    CONF_PROMPT,  
+    CONF_REASONING_EFFORT,  
+    CONF_RECOMMENDED,  
+    CONF_TEMPERATURE,  
+    CONF_TOP_P,  
+    CONF_WEB_SEARCH,  
+    CONF_WEB_SEARCH_CITY,  
+    CONF_WEB_SEARCH_CONTEXT_SIZE,  
+    CONF_WEB_SEARCH_COUNTRY,  
+    CONF_WEB_SEARCH_REGION,  
+    CONF_WEB_SEARCH_TIMEZONE,  
+    CONF_WEB_SEARCH_USER_LOCATION,  
+    CONF_API_TIMEOUT,  
+    DOMAIN,  
+    RECOMMENDED_CHAT_MODEL,  
+    RECOMMENDED_MAX_TOKENS,  
+    RECOMMENDED_REASONING_EFFORT,  
+    RECOMMENDED_TEMPERATURE,  
+    RECOMMENDED_TOP_P,  
+    RECOMMENDED_WEB_SEARCH,  
+    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
+    RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
+    RECOMMENDED_API_TIMEOUT,  
+    UNSUPPORTED_MODELS,  
+    WEB_SEARCH_MODELS,  
+)  
+from . import normalize_azure_endpoint  
+  
+_LOGGER = logging.getLogger(__name__)  
+  
+API_VERSION = "2024-05-01-preview"  
+MODELS_API_VERSION = "2025-01-01-preview"  
+  
+STEP_USER_DATA_SCHEMA = vol.Schema(  
+    {  
+        vol.Required(CONF_API_KEY): str,  
+        vol.Required(CONF_API_BASE): str,  
+        vol.Required(CONF_CHAT_MODEL, default=RECOMMENDED_CHAT_MODEL): str,  
+    }  
+)  
+  
+RECOMMENDED_OPTIONS = {  
+    CONF_RECOMMENDED: True,  
+    CONF_LLM_HASS_API: llm.LLM_API_ASSIST,  
+    CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,  
+}  
+  
+# ----------------------------------------------------------------------  
+#  Quale parametro usa la libreria OpenAI?  
+# ----------------------------------------------------------------------  
+def _token_param() -> str:  
+    return (  
+        "max_tokens"  
+        if "max_tokens" in getattr(openai, "__all__", [])  # type: ignore[attr-defined]  
+        else "max_completion_tokens"  
+    )  
+  
+  
+# ----------------------------------------------------------------------  
+#  Helpers per diagnostica / logging  
+# ----------------------------------------------------------------------  
+def _extract_azure_error(  
+    err: openai.OpenAIError,  
+) -> Tuple[int | None, str | None, str | None, Any]:  
+    status = getattr(err, "status_code", None)  
+    azure_code: str | None = None  
+    azure_msg: str | None = None  
+    details: Any = None  
+  
+    resp = getattr(err, "response", None)  
+    if resp is not None:  
+        try:  
+            details = resp.json()  
+        except Exception:  # pragma: no cover  
+            try:  
+                details = resp.text  
+            except Exception:  # pragma: no cover  
+                details = None  
+  
+    if isinstance(details, dict):  
+        data = details.get("error") or details  
+        if isinstance(data, dict):  
+            azure_code = data.get("code") or data.get("type")  
+            azure_msg = data.get("message") or data.get("error")  
+  
+    if azure_msg is None:  
+        azure_msg = str(err)  
+  
+    return status, azure_code, azure_msg, details  
+  
+  
+def _looks_like_deployment_error(code: str | None, msg: str | None) -> bool:  
+    code = (code or "").lower()  
+    msg = (msg or "").lower()  
+    return any(  
+        k in code  
+        for k in (  
+            "deploymentnotfound",  
+            "invaliddeployment",  
+            "modelnotfound",  
+            "404",  
+        )  
+    ) or (  
+        "deployment" in msg  
+        and (  
+            "not found" in msg  
+            or "does not exist" in msg  
+            or "invalid" in msg  
+        )  
+    ) or ("resource not found" in msg)  
+  
+  
+def _looks_like_api_version_error(msg: str | None) -> bool:  
+    msg = (msg or "").lower()  
+    return "is enabled only for api versions" in msg and "and later" in msg  
+  
+  
+def _extract_required_api_version(msg: str | None) -> str | None:  
+    if not msg:  
+        return None  
+    msg = msg.lower()  
+    if "is enabled only for api versions" in msg:  
+        parts = msg.split("api versions")  
+        if len(parts) > 1:  
+            version_part = parts[1].split("and later")[0].strip()  
+            return version_part  
+    return None  
+  
+  
+# ----------------------------------------------------------------------  
+#  Log prettifier  
+# ----------------------------------------------------------------------  
+def _stringify_deployments(items: list[dict[str, Any]]) -> str:  
+    if not items:  
+        return "<none>"  
+    return ", ".join(  
+        f"{it.get('id') or it.get('name')} ({it.get('model', {}).get('name','?')})"  
+        for it in items  
+    )  
+  
+  
+def _stringify_models(items: list[dict[str, Any]]) -> str:  
+    if not items:  
+        return "<none>"  
+    return ", ".join(  
+        sorted({it.get("id") or it.get("name") for it in items if it})  
+    )  
+  
+  
+# ----------------------------------------------------------------------  
+#  Probe helpers (DEBUG – non bloccano il flow)  
+# ----------------------------------------------------------------------  
+async def _list_azure_deployments(  
+    hass: HomeAssistant,  
+    base_url: str,  
+    api_key: str,  
+) -> None:  # pragma: no cover  
+    http = get_async_client(hass)  
+    url = f"{base_url.rstrip('/')}/deployments?api-version={API_VERSION}"  
+    try:  
+        resp = await http.get(url, headers={"api-key": api_key}, timeout=15)  
+        data = resp.json()  
+    except Exception as err:  # pylint: disable=broad-except  
+        _LOGGER.debug("probe deployments failed: %s", err)  
+        return  
+    items = data.get("data", []) if isinstance(data, dict) else []  
+    _LOGGER.debug(  
+        "deployments(%s): %s",  
+        resp.status_code,  
+        _stringify_deployments(items),  
+    )  
+  
+  
+async def _list_azure_models(  
+    hass: HomeAssistant,  
+    base_url: str,  
+    api_key: str,  
+) -> list[dict[str, Any]]:  
+    http = get_async_client(hass)  
+    url = f"{base_url.rstrip('/')}/models?api-version={MODELS_API_VERSION}"  
+    try:  
+        resp = await http.get(url, headers={"api-key": api_key}, timeout=15)  
+        data = resp.json()  
+    except Exception as err:  # pylint: disable=broad-except  
+        _LOGGER.debug("probe models failed: %s", err)  
+        return []  
+    items = data.get("data", []) if isinstance(data, dict) else []  
+    _LOGGER.debug(  
+        "models(%s): %s",  
+        resp.status_code,  
+        _stringify_models(items),  
+    )  
+    return items  
+  
+  
+# ----------------------------------------------------------------------  
+#  Recupero delle capabilities del deployment  
+# ----------------------------------------------------------------------  
+async def get_sampling_capabilities(  
+    hass: HomeAssistant,  
+    base_url: str,  
+    api_key: str,  
+    deployment_id: str,  
+) -> Dict[str, Dict[str, Any]]:  
+    """Restituisce le sampling-capabilities del deployment richiesto."""  
+    root = normalize_azure_endpoint(base_url).rstrip("/").removesuffix("/openai")  
+  
+    client = AsyncAzureOpenAI(  
+        api_key=api_key,  
+        api_version="2024-05-01-preview",  # Usiamo una versione recente per capabilities  
+        azure_endpoint=root,  
+        http_client=get_async_client(hass),  
+    )  
+  
+    # --- Qual è l'endpoint disponibile? -----------------------------  
+    try:  
+        if hasattr(client, "deployments"):  
+            resp = await client.deployments.list()  
+            items = getattr(resp, "data", [])  
+        else:  
+            # Fallback su /models se deployments non disponibile  
+            resp = await client.models.list()  
+            items = getattr(resp, "data", [])  
+    except Exception as err:  # noqa: BLE001  
+        _LOGGER.error("Failed to retrieve capabilities: %s", err)  
+        raise ValueError("Impossibile recuperare le capabilities del deployment") from err  
+  
+    # --- Estrai capabilities per il deployment richiesto ------------  
+    sampling_params: dict[str, dict[str, Any]] = {}  
+  
+    for obj in items:  
+        if obj.id != deployment_id:  
+            continue  
+        caps = getattr(obj, "capabilities", None)  
+        if not caps:  
+            break  
+        sampling = getattr(caps, "sampling_parameters", None)  
+        if not sampling:  
+            break  
+        for item in sampling:  # list[dict]  
+            name = item.get("name")  
+            if not name:  
+                continue  
+            sampling_params[name] = {  
+                "default": item.get("default"),  
+                "min": item.get("minimum"),  
+                "max": item.get("maximum"),  
+                "step": item.get("step"),  
+            }  
+        break  # Trovato il deployment, usciamo dal loop  
+  
+    _LOGGER.debug(  
+        "Sampling capabilities for %s: %s", deployment_id, sampling_params  
+    )  
+    return sampling_params  
+  
+  
+# ----------------------------------------------------------------------  
+#  Validazione credenziali  
+# ----------------------------------------------------------------------  
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> tuple[dict[str, Any], str]:  
+    """Chiama Chat Completions per verificare chiave + deployment."""  
+    base_openai = normalize_azure_endpoint(data[CONF_API_BASE]).rstrip("/")  
+    azure_endpoint_root = base_openai.removesuffix("/openai")  
+    deployment = data[CONF_CHAT_MODEL].strip()  
+  
+    client = AsyncAzureOpenAI(  
+        api_key=data[CONF_API_KEY],  
+        api_version=API_VERSION,  
+        azure_endpoint=azure_endpoint_root,  
+        http_client=get_async_client(hass),  
+    )  
+  
+    payload = {  
+        "messages": [  
+            {"role": "system", "content": "You are a helpful assistant."},  
+            {"role": "user", "content": "ping"},  
+        ],  
+        "max_tokens": 10,  
+        "model": deployment,  
+    }  
+  
+    token_param_used = "max_tokens"  
+    required_api_version = API_VERSION  
+    try:  
+        await client.chat.completions.create(  
+            model=deployment,  
+            messages=payload["messages"],  
+            max_tokens=payload["max_tokens"],  
+        )  
+        return {"token_param": token_param_used, "api_version": required_api_version}, token_param_used  
+    except openai.BadRequestError as err:  
+        status, code, msg, _ = _extract_azure_error(err)  
+        if _looks_like_api_version_error(msg):  
+            required_api_version = _extract_required_api_version(msg) or API_VERSION  
+            _LOGGER.debug("API version error detected. Required version: %s", required_api_version)  
+            raise ValueError(f"API version error: {msg}")  
+        _LOGGER.debug("Errore con max_tokens, tento con max_completion_tokens: %s", err)  
+        payload.pop("max_tokens")  
+        payload["max_completion_tokens"] = 10  
+        token_param_used = "max_completion_tokens"  
+        try:  
+            await client.chat.completions.create(  
+                model=deployment,  
+                messages=payload["messages"],  
+                max_completion_tokens=payload["max_completion_tokens"],  
+            )  
+            return {"token_param": token_param_used, "api_version": required_api_version}, token_param_used  
+        except openai.BadRequestError as err2:  
+            status, code, msg, _ = _extract_azure_error(err2)  
+            if _looks_like_api_version_error(msg):  
+                required_api_version = _extract_required_api_version(msg) or API_VERSION  
+                _LOGGER.debug("API version error detected on second attempt. Required version: %s", required_api_version)  
+                raise ValueError(f"API version error: {msg}")  
+            if _looks_like_deployment_error(code, msg):  
+                await _list_azure_deployments(hass, base_openai, data[CONF_API_KEY])  
+                await _list_azure_models(hass, base_openai, data[CONF_API_KEY])  
+            raise err2  
+    except openai.AuthenticationError:  
+        raise  
+    except openai.NotFoundError as err:  
+        await _list_azure_deployments(hass, base_openai, data[CONF_API_KEY])  
+        await _list_azure_models(hass, base_openai, data[CONF_API_KEY])  
+        raise err  
+    except openai.APIConnectionError:  
+        raise  
+  
+  
+# ----------------------------------------------------------------------  
+#  ConfigFlow  
+# ----------------------------------------------------------------------  
+class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):  
+    """Handle a config flow for the integration."""  
+  
+    VERSION = 1  
+  
+    def __init__(self) -> None:  
+        self._step1_data: dict[str, Any] | None = None  
+        self._sampling_caps: dict[str, dict[str, Any]] = {}  
+        self._token_param: str = "max_tokens"  
+        self._api_version: str = API_VERSION  
+  
+    async def async_step_user(  
+        self, user_input: dict[str, Any] | None = None  
+    ) -> ConfigFlowResult:  
+        if user_input is None:  
+            return self.async_show_form(  
+                step_id="user",  
+                data_schema=STEP_USER_DATA_SCHEMA,  
+            )  
+  
+        inp = {  
+            CONF_API_KEY: user_input[CONF_API_KEY],  
+            CONF_API_BASE: user_input[CONF_API_BASE].strip(),  
+            CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),  
+        }  
+  
+        errors: dict[str, str] = {}  
+        try:  
+            result, token_param_used = await validate_input(self.hass, inp)  
+            self._token_param = token_param_used  
+            self._api_version = result.get("api_version", API_VERSION)  
+        except ValueError as ve:  
+            error_msg = str(ve)  
+            if "API version error" in error_msg:  
+                errors["base"] = "api_version_unsupported"  
+                _LOGGER.error("API version unsupported: %s", error_msg)  
+            else:  
+                errors["base"] = "unknown"  
+                _LOGGER.exception("Unexpected failure in config flow")  
+        except openai.AuthenticationError:  
+            errors["base"] = "invalid_auth"  
+        except openai.NotFoundError:  
+            errors["base"] = "invalid_deployment"  
+        except openai.BadRequestError as err:  
+            _, code, msg, _ = _extract_azure_error(err)  
+            errors["base"] = (  
+                "invalid_deployment"  
+                if _looks_like_deployment_error(code, msg)  
+                else "bad_request"  
+            )  
+        except openai.APIConnectionError:  
+            errors["base"] = "cannot_connect"  
+        except Exception:  # pylint: disable=broad-except  
+            _LOGGER.exception("unexpected failure in config flow")  
+            errors["base"] = "unknown"  
+  
+        if errors:  
+            return self.async_show_form(  
+                step_id="user",  
+                data_schema=STEP_USER_DATA_SCHEMA,  
+                errors=errors,  
+                description_placeholders={"error_detail": errors.get("base", "")},  
+            )  
+  
+        # Recupera le capabilities del deployment  
+        try:  
+            self._step1_data = inp  
+            self._sampling_caps = await get_sampling_capabilities(  
+                self.hass,  
+                inp[CONF_API_BASE],  
+                inp[CONF_API_KEY],  
+                inp[CONF_CHAT_MODEL],  
+            )  
+        except ValueError as err:  
+            _LOGGER.error(  
+                "Config flow aborted due to failure in retrieving capabilities: %s",  
+                err,  
+            )  
+            return self.async_abort(reason="capabilities_not_retrieved")  
+  
+        # Procedi allo step dei parametri  
+        return await self.async_step_params()  
+  
+    async def async_step_params(  
+        self, user_input: dict[str, Any] | None = None  
+    ) -> ConfigFlowResult:  
+        """Ask for sampling parameters supported by the deployment or use recommended defaults."""  
+        assert self._step1_data is not None  # nosec B101  
+  
+        errors: dict[str, str] = {}  
+        if user_input is not None:  
+            # Cast numeric fields  
+            cleaned: dict[str, Any] = {}  
+            for k, v in user_input.items():  
+                if k in self._sampling_caps:  
+                    meta = self._sampling_caps[k]  
+                    if isinstance(meta.get("default"), (int, float)):  
+                        try:  
+                            cleaned[k] = float(v) if "." in str(v) else int(v)  
+                        except Exception:  # noqa: BLE001  
+                            errors[k] = "invalid_number"  
+                    else:  
+                        cleaned[k] = v  # string / bool / enum  
+            if not errors:  
+                return self._create_entry(options=cleaned)  
+  
+        schema_dict: VolDictType = {}  
+        for name, meta in self._sampling_caps.items():  
+            default = meta.get("default")  
+            if isinstance(default, (int, float)):  
+                schema_dict[vol.Optional(name, default=default)] = NumberSelector(  
+                    NumberSelectorConfig(  
+                        min=meta.get("min", 0),  
+                        max=meta.get("max", 2),  
+                        step=meta.get("step", 0.05) or 0.05,  
+                    )  
+                )  
+            else:  
+                schema_dict[vol.Optional(name)] = str  
+  
+        if not schema_dict:  
+            # Se non ci sono parametri da configurare, procedi direttamente alla creazione  
+            return self._create_entry(options={})  
+  
+        return self.async_show_form(  
+            step_id="params", data_schema=vol.Schema(schema_dict), errors=errors  
+        )  
+  
+    def _create_entry(self, *, options: Mapping[str, Any]) -> ConfigFlowResult:  
+        """Finalize flow and create the config-entry."""  
+        assert self._step1_data is not None  # nosec B101  
+        unique_id = (  
+            f"{normalize_azure_endpoint(self._step1_data[CONF_API_BASE])}"  
+            f"::{self._step1_data[CONF_CHAT_MODEL]}"  
+        )  
+        self.async_set_unique_id(unique_id)  
+        self._abort_if_unique_id_configured()  
+  
+        base_opts: Dict[str, Any] = {  
+            CONF_RECOMMENDED: False,  
+            CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,  
+            CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,  
+            CONF_LLM_HASS_API: llm.LLM_API_ASSIST,  # abilita Assist di default  
+            "token_param": self._token_param,  # Memorizza il parametro funzionante  
+            "api_version": self._api_version,  # Memorizza la versione API  
+        }  
+        base_opts.update(options)  
+  
+        return self.async_create_entry(  
+            title=f"Azure OpenAI SDK: {self._step1_data[CONF_CHAT_MODEL]}",  
+            data={  
+                CONF_API_KEY: self._step1_data[CONF_API_KEY],  
+                CONF_API_BASE: self._step1_data[CONF_API_BASE],  
+                CONF_CHAT_MODEL: self._step1_data[CONF_CHAT_MODEL],  
+            },  
+            options=base_opts,  
+        )  
+  
+    @staticmethod  
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:  # noqa: D401  
+        return AzureOpenAIOptionsFlow(config_entry)  
+  
+  
+# ----------------------------------------------------------------------  
+#  OptionsFlow  
+# ----------------------------------------------------------------------  
+class AzureOpenAIOptionsFlow(OptionsFlow):  
+    """Handle options for an existing entry."""  
+  
+    def __init__(self, config_entry: ConfigEntry) -> None:  
+        self.config_entry = config_entry  
+        self.last_rendered_recommended = config_entry.options.get(  
+            CONF_RECOMMENDED, False  
+        )  
+        self.available_api_versions: list[str] = []  
+  
+    async def async_step_init(  
+        self, user_input: dict[str, Any] | None = None  
+    ) -> ConfigFlowResult:  
+        """  
+        Step di configurazione opzioni.  
+          
+        • Mantiene sempre tutti i valori correnti (data+options)  
+        • Non scarta `chat_model`, `api_base`, ecc. anche se coincidenti  
+        • Pulisce soltanto i campi vuoti ("", None)  
+        """  
+        base_options: dict[str, Any] = {  
+            **self.config_entry.data,  
+            **self.config_entry.options,  
+        }  
+  
+        # Recupera lista di modelli e versioni API supportate (se disponibili)  
+        if not self.available_api_versions:  
+            models = await _list_azure_models(  
+                self.hass,  
+                base_options.get(CONF_API_BASE, ""),  
+                base_options.get(CONF_API_KEY, "")  
+            )  
+            for model in models:  
+                model_id = model.get("id", "")  
+                if model_id == base_options.get(CONF_CHAT_MODEL, ""):  
+                    # Estrai informazioni sulle versioni API supportate (simulazione)  
+                    # In realtà, Azure non fornisce questa informazione diretta nella risposta models  
+                    # Quindi lasciamo come placeholder per logica futura  
+                    self.available_api_versions = ["2024-05-01-preview", "2024-12-01-preview", "2025-01-01-preview"]  
+  
+        errors: dict[str, str] = {}  
+  
+        # ----------------- Salvataggio -----------------------------  
+        if user_input is not None:  
+            if user_input[CONF_RECOMMENDED] == self.last_rendered_recommended:  
+                # Coerenza  
+                if not user_input.get(CONF_LLM_HASS_API):  
+                    user_input.pop(CONF_LLM_HASS_API, None)  
+  
+                if user_input.get(CONF_CHAT_MODEL) in UNSUPPORTED_MODELS:  
+                    errors[CONF_CHAT_MODEL] = "model_not_supported"  
+  
+                if (  
+                    user_input.get(CONF_WEB_SEARCH)  
+                    and user_input.get(  
+                        CONF_CHAT_MODEL,  
+                        RECOMMENDED_CHAT_MODEL,  
+                    )  
+                    not in WEB_SEARCH_MODELS  
+                ):  
+                    errors[CONF_WEB_SEARCH] = "web_search_not_supported"  
+  
+                # Cast numerico  
+                for fld in (CONF_TEMPERATURE, CONF_TOP_P):  
+                    if fld in user_input:  
+                        user_input[fld] = float(user_input[fld])  
+                if CONF_MAX_TOKENS in user_input:  
+                    user_input[CONF_MAX_TOKENS] = int(user_input[CONF_MAX_TOKENS])  
+                if CONF_API_TIMEOUT in user_input:  
+                    user_input[CONF_API_TIMEOUT] = int(user_input[CONF_API_TIMEOUT])  
+  
+                # Pulisci i valori *vuoti* ma NON quelli di default  
+                cleaned = {  
+                    k: v  
+                    for k, v in user_input.items()  
+                    if v not in ("", None)  
+                }  
+  
+                if not errors:  
+                    _LOGGER.debug(  
+                        "Saving AzureOpenAI options: %s",  
+                        {k: ("***" if k == CONF_API_KEY else v) for k, v in cleaned.items()},  
+                    )  
+                    return self.async_create_entry(title="", data=cleaned)  
+  
+            # ----- toggle “recommended” → ricrea schema -------------  
+            self.last_rendered_recommended = user_input[CONF_RECOMMENDED]  
+            base_options.update(user_input)  
+  
+        # ----------------- Rendering form --------------------------  
+        schema = self.openai_config_option_schema(self.hass, base_options)  
+  
+        return self.async_show_form(  
+            step_id="init",  
+            data_schema=vol.Schema(schema),  
+            errors=errors,  
+        )  
+  
+    # ------------------------------------------------------------------  
+    #  Web search – location helper  
+    # ------------------------------------------------------------------  
+    async def get_location_data(self) -> dict[str, str]:  
+        """Approximate user location from HA zone.home (optional)."""  
+        location_data: dict[str, str] = {}  
+        zone_home = self.hass.states.get(ENTITY_ID_HOME)  
+  
+        if zone_home is not None:  
+            base_openai = normalize_azure_endpoint(  
+                self.config_entry.data[CONF_API_BASE]  
+            ).rstrip("/")  
+            azure_endpoint_root = base_openai.removesuffix("/openai")  
+            client = AsyncAzureOpenAI(  
+                api_key=self.config_entry.data[CONF_API_KEY],  
+                api_version=API_VERSION,  
+                azure_endpoint=azure_endpoint_root,  
+                http_client=get_async_client(self.hass),  
+            )  
+  
+            location_schema = vol.Schema(  
+                {  
+                    vol.Optional(CONF_WEB_SEARCH_CITY): str,  
+                    vol.Optional(CONF_WEB_SEARCH_REGION): str,  
+                }  
+            )  
+  
+            resp_payload = {  
+                "model": self.config_entry.options.get(  
+                    CONF_CHAT_MODEL,  
+                    RECOMMENDED_CHAT_MODEL,  
+                ),  
+                "input": [  
+                    {  
+                        "role": "system",  
+                        "content": (  
+                            "Where are the following coordinates located: "  
+                            f"({zone_home.attributes[ATTR_LATITUDE]}, "  
+                            f"{zone_home.attributes[ATTR_LONGITUDE]})?"  
+                        ),  
+                    }  
+                ],  
+                "text": {  
+                    "format": {  
+                        "type": "json_schema",  
+                        "name": "approximate_location",  
+                        "description": "Approximate location for refined web search",  
+                        "schema": convert(location_schema),  
+                        "strict": False,  
+                    }  
+                },  
+                "store": False,  
+            }  
+  
+            extra_body = {_token_param(): 32}  
+  
+            response = await client.responses.create(  
+                **resp_payload,  
+                extra_body=extra_body,  # type: ignore[arg-type]  
+            )  
+            try:  
+                location_data = location_schema(json.loads(response.output_text) or {})  
+            except Exception as err:  # pylint: disable=broad-except  
+                _LOGGER.error("location response parse error: %s", err)  
+  
+        # complete with HA config  
+        if self.hass.config.country:  
+            location_data[CONF_WEB_SEARCH_COUNTRY] = self.hass.config.country  
+        location_data[CONF_WEB_SEARCH_TIMEZONE] = self.hass.config.time_zone  
+        return location_data  
+  
+    # ----------------------------------------------------------------------  
+    #  Schema dinamico per le opzioni  
+    # ----------------------------------------------------------------------  
+    def openai_config_option_schema(  
+        self, hass: HomeAssistant, options: Mapping[str, Any]  
+    ) -> VolDictType:  
+        hass_apis: list[SelectOptionDict] = [  
+            SelectOptionDict(label=api.name, value=api.id)  
+            for api in llm.async_get_apis(hass)  
+        ]  
+        suggested_llm_apis = options.get(CONF_LLM_HASS_API)  
+        if isinstance(suggested_llm_apis, str):  
+            suggested_llm_apis = [suggested_llm_apis]  
+  
+        schema: VolDictType = {  
+            vol.Optional(  
+                CONF_PROMPT,  
+                description={  
+                    "suggested_value": options.get(  
+                        CONF_PROMPT,  
+                        llm.DEFAULT_INSTRUCTIONS_PROMPT,  
+                    )  
+                },  
+            ): TemplateSelector(),  
+            vol.Optional(  
+                CONF_LLM_HASS_API,  
+                description={"suggested_value": suggested_llm_apis},  
+            ): SelectSelector(  
+                SelectSelectorConfig(options=hass_apis, multiple=True)  
+            ),  
+            vol.Required(  
+                CONF_RECOMMENDED,  
+                default=options.get(CONF_RECOMMENDED, False),  
+            ): bool,  
+        }  
+  
+        if options.get(CONF_RECOMMENDED):  
+            return schema  
+  
+        # Aggiungi selezione della versione API  
+        api_version_options = [  
+            SelectOptionDict(label=version, value=version)  
+            for version in self.available_api_versions  
+        ] if self.available_api_versions else [  
+            SelectOptionDict(label="2024-05-01-preview", value="2024-05-01-preview"),  
+            SelectOptionDict(label="2024-12-01-preview", value="2024-12-01-preview"),  
+            SelectOptionDict(label="2025-01-01-preview", value="2025-01-01-preview"),  
+        ]  
+  
+        schema.update(  
+            {  
+                vol.Optional(  
+                    CONF_API_BASE,  
+                    description={"suggested_value": options.get(CONF_API_BASE)},  
+                    default=options.get(CONF_API_BASE, ""),  
+                ): str,  
+                vol.Optional(  
+                    CONF_CHAT_MODEL,  
+                    description={"suggested_value": options.get(CONF_CHAT_MODEL)},  
+                    default=options.get(CONF_CHAT_MODEL, ""),  
+                ): str,  
+                vol.Optional(  
+                    "api_version",  
+                    description={"suggested_value": options.get("api_version", API_VERSION)},  
+                    default=options.get("api_version", API_VERSION),  
+                ): SelectSelector(  
+                    SelectSelectorConfig(  
+                        options=api_version_options,  
+                        mode=SelectSelectorMode.DROPDOWN,  
+                    )  
+                ),  
+                vol.Optional(  
+                    CONF_MAX_TOKENS,  
+                    description={"suggested_value": options.get(CONF_MAX_TOKENS)},  
+                    default=RECOMMENDED_MAX_TOKENS,  
+                ): int,  
+                vol.Optional(  
+                    CONF_TOP_P,  
+                    description={"suggested_value": options.get(CONF_TOP_P)},  
+                    default=RECOMMENDED_TOP_P,  
+                ): NumberSelector(NumberSelectorConfig(min=0, max=1, step=0.05)),  
+                vol.Optional(  
+                    CONF_TEMPERATURE,  
+                    description={"suggested_value": options.get(CONF_TEMPERATURE)},  
+                    default=RECOMMENDED_TEMPERATURE,  
+                ): NumberSelector(NumberSelectorConfig(min=0, max=2, step=0.05)),  
+                vol.Optional(  
+                    CONF_REASONING_EFFORT,  
+                    description={"suggested_value": options.get(CONF_REASONING_EFFORT)},  
+                    default=RECOMMENDED_REASONING_EFFORT,  
+                ): SelectSelector(  
+                    SelectSelectorConfig(  
+                        options=["low", "medium", "high"],  
+                        translation_key=CONF_REASONING_EFFORT,  
+                        mode=SelectSelectorMode.DROPDOWN,  
+                    )  
+                ),  
+                vol.Optional(  
+                    CONF_WEB_SEARCH,  
+                    description={"suggested_value": options.get(CONF_WEB_SEARCH)},  
+                    default=RECOMMENDED_WEB_SEARCH,  
+                ): bool,  
+                vol.Optional(  
+                    CONF_WEB_SEARCH_CONTEXT_SIZE,  
+                    description={  
+                        "suggested_value": options.get(CONF_WEB_SEARCH_CONTEXT_SIZE)  
+                    },  
+                    default=RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
+                ): SelectSelector(  
+                    SelectSelectorConfig(  
+                        options=["low", "medium", "high"],  
+                        translation_key=CONF_WEB_SEARCH_CONTEXT_SIZE,  
+                        mode=SelectSelectorMode.DROPDOWN,  
+                    )  
+                ),  
+                vol.Optional(  
+                    CONF_WEB_SEARCH_USER_LOCATION,  
+                    description={  
+                        "suggested_value": options.get(CONF_WEB_SEARCH_USER_LOCATION)  
+                    },  
+                    default=RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
+                ): bool,  
+                vol.Optional(  
+                    CONF_API_TIMEOUT,  
+                    description={"suggested_value": options.get(CONF_API_TIMEOUT)},  
+                    default=RECOMMENDED_API_TIMEOUT,  
+                ): NumberSelector(NumberSelectorConfig(min=5, max=120, step=1)),  
+            }  
+        )  
+        return schema  

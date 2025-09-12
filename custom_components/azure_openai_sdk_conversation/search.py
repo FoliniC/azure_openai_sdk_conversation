@@ -1,69 +1,72 @@
-"""Lightweight Bing Web Search helper for Azure OpenAI SDK Conversation."""  
+"""Simple web search client used to enrich prompts."""  
 from __future__ import annotations  
   
-import logging  
-from typing import List  
-  
+from typing import Any, Optional  
+import json  
 import httpx  
-  
-_LOGGER = logging.getLogger(__name__)  
-  
-BING_ENDPOINT_DEFAULT = "https://api.bing.microsoft.com/v7.0/search"  
   
   
 class WebSearchClient:  
-    """Very small wrapper around Bing Web Search REST API v7."""  
+  """Thin wrapper around Bing Web Search."""  
   
-    def __init__(  
-        self,  
-        api_key: str,  
-        endpoint: str = BING_ENDPOINT_DEFAULT,  
-        *,  
-        max_results: int = 5,  
-        timeout: float = 10.0,  
-    ) -> None:  
-        self._api_key = api_key  
-        self._endpoint = endpoint  
-        self._max_results = max_results  
-        self._timeout = timeout  
-        self._client = httpx.AsyncClient(  
-            headers={  
-                "Ocp-Apim-Subscription-Key": self._api_key,  
-                "User-Agent": "ha-azure-openai-search/1.0",  
-            },  
-            timeout=self._timeout,  
-        )  
+  BING_ENDPOINT_DEFAULT = "https://api.bing.microsoft.com/v7.0/search"  
   
-    async def close(self) -> None:  
-        await self._client.aclose()  
+  def __init__(self, api_key: str, endpoint: Optional[str] = None, max_results: int = 5) -> None:  
+    self._api_key = api_key or ""  
+    self._endpoint = (endpoint or self.BING_ENDPOINT_DEFAULT).rstrip("/")  
+    self._max_results = max_results  
+    self._client: httpx.AsyncClient | None = None  
   
-    async def search(self, query: str) -> str | None:  
-        """Run a web search and return a formatted markdown string."""  
-        params = {  
-            "q": query,  
-            "mkt": "en-US",  
-            "safeSearch": "Moderate",  
-            "count": self._max_results,  
-            "textFormat": "Raw",  
-        }  
-        try:  
-            resp = await self._client.get(self._endpoint, params=params)  
-            resp.raise_for_status()  
-            data = resp.json()  
-        except (httpx.HTTPError, ValueError) as err:  
-            _LOGGER.warning("Web search failed: %s", err)  
-            return None  
+  async def _client_async(self) -> httpx.AsyncClient:  
+    if self._client is None:  
+      self._client = httpx.AsyncClient(timeout=15)  
+    return self._client  
   
-        web_pages = data.get("webPages", {}).get("value", [])  
-        if not web_pages:  
-            return None  
+  async def close(self) -> None:  
+    if self._client is not None:  
+      await self._client.aclose()  
+      self._client = None  
   
-        # Convert top N results to a compact markdown list  
-        lines: List[str] = []  
-        for idx, item in enumerate(web_pages[: self._max_results], start=1):  
-            title = item.get("name", "No title")  
-            snippet = item.get("snippet", "").strip().replace("\n", " ")  
-            url = item.get("url", "")  
-            lines.append(f"{idx}. **{title}** – {snippet}  \n   {url}")  
+  async def search(self, query: str) -> str:  
+    """Return a small Markdown block with top search results; JSON parsed without blocking the loop."""  
+    if not self._api_key or not query:  
+      return ""  
   
-        return "\n".join(lines)  
+    client = await self._client_async()  
+    headers = {  
+      "Ocp-Apim-Subscription-Key": self._api_key,  
+      "Accept": "application/json",  
+    }  
+    params = {"q": query, "count": max(1, int(self._max_results or 5))}  
+    url = self._endpoint  
+  
+    try:  
+      resp = await client.get(url, headers=headers, params=params)  
+    except Exception:  
+      return ""  
+  
+    if resp.status_code >= 400:  
+      # Non logghiamo dettagli sensibili qui  
+      return ""  
+  
+    # Evita Response.json() (sincrono): usa aread + json.loads  
+    raw = await resp.aread()  
+    try:  
+      data = json.loads(raw.decode("utf-8", "ignore"))  
+    except Exception:  
+      return ""  
+  
+    web_pages = (data or {}).get("webPages", {})  
+    items: list[dict[str, Any]] = web_pages.get("value") or []  
+    if not items:  
+      return ""  
+  
+    lines = ["Top results:"]  
+    for it in items[: self._max_results]:  
+      name = it.get("name") or ""  
+      url = it.get("url") or ""  
+      snippet = it.get("snippet") or ""  
+      if name and url:  
+        lines.append(f"- [{name}]({url}) — {snippet}")  
+  
+    return "\n".join(lines)  
