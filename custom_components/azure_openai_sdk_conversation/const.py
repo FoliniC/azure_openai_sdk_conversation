@@ -1,3 +1,4 @@
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py  
 """Costanti per l'integrazione Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
@@ -35,6 +36,12 @@ CONF_WEB_SEARCH_USER_LOCATION: Final[str] = "web_search_user_location"
   
 # Flag per UI/flow (es. schema "preset consigliato")  
 CONF_RECOMMENDED: Final[str] = "recommended"  
+  
+# Chiavi errori per UI/config flow  
+ERROR_CANNOT_CONNECT: Final[str] = "cannot_connect"  
+ERROR_INVALID_AUTH: Final[str] = "invalid_auth"  
+ERROR_INVALID_DEPLOYMENT: Final[str] = "invalid_deployment"  
+ERROR_UNKNOWN: Final[str] = "unknown"  
   
 # Alias per opzioni (backcompat con versioni precedenti che usano OPT_*)  
 OPT_TEMPERATURE: Final[str] = CONF_TEMPERATURE  
@@ -93,6 +100,11 @@ __all__ = [
     "CONF_WEB_SEARCH_CONTEXT_SIZE",  
     "CONF_WEB_SEARCH_USER_LOCATION",  
     "CONF_RECOMMENDED",  
+    # Error keys  
+    "ERROR_CANNOT_CONNECT",  
+    "ERROR_INVALID_AUTH",  
+    "ERROR_INVALID_DEPLOYMENT",  
+    "ERROR_UNKNOWN",  
     # Option aliases (OPT_*)  
     "OPT_TEMPERATURE",  
     "OPT_TOP_P",  

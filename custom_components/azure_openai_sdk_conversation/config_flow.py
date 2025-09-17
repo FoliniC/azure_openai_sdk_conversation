@@ -1,3 +1,4 @@
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/config_flow.py  
 """Config flow for Azure OpenAI SDK Conversation – versione 2025.9+."""  
 from __future__ import annotations  
   
@@ -5,47 +6,51 @@ import logging
 from typing import Any, Mapping  
   
 import voluptuous as vol  
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlow  
+from homeassistant.config_entries import (  
+    ConfigEntry,  
+    ConfigFlow,  
+    ConfigFlowResult,  
+    OptionsFlow,  
+)  
 from homeassistant.const import CONF_API_KEY  
 from homeassistant.core import HomeAssistant  
 from homeassistant.helpers import llm  
-from homeassistant.helpers.httpx_client import get_async_client  
+from homeassistant.helpers.httpx_client import get_async_client  # noqa: F401  
 from homeassistant.helpers.selector import (  
-  NumberSelector,  
-  NumberSelectorConfig,  
-  SelectOptionDict,  
-  SelectSelector,  
-  SelectSelectorConfig,  
-  SelectSelectorMode,  
-  TemplateSelector,  
+    NumberSelector,  
+    NumberSelectorConfig,  
+    SelectSelector,  
+    SelectSelectorConfig,  
+    SelectSelectorMode,  
+    TemplateSelector,  
 )  
 from homeassistant.helpers.typing import VolDictType  
   
 from . import normalize_azure_endpoint  
 from .const import (  
-  CONF_API_BASE,  
-  CONF_API_VERSION,  
-  CONF_CHAT_MODEL,  
-  CONF_MAX_TOKENS,  
-  CONF_PROMPT,  
-  CONF_REASONING_EFFORT,  
-  CONF_RECOMMENDED,  
-  CONF_TEMPERATURE,  
-  CONF_TOP_P,  
-  CONF_WEB_SEARCH,  
-  CONF_WEB_SEARCH_CONTEXT_SIZE,  
-  CONF_WEB_SEARCH_USER_LOCATION,  
-  CONF_EXPOSED_ENTITIES_LIMIT,  
-  DOMAIN,  
-  RECOMMENDED_CHAT_MODEL,  
-  RECOMMENDED_MAX_TOKENS,  
-  RECOMMENDED_REASONING_EFFORT,  
-  RECOMMENDED_TEMPERATURE,  
-  RECOMMENDED_TOP_P,  
-  RECOMMENDED_WEB_SEARCH,  
-  RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
-  RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
-  RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+    CONF_API_BASE,  
+    CONF_API_VERSION,  
+    CONF_CHAT_MODEL,  
+    CONF_MAX_TOKENS,  
+    CONF_PROMPT,  
+    CONF_REASONING_EFFORT,  
+    CONF_RECOMMENDED,  
+    CONF_TEMPERATURE,  
+    CONF_TOP_P,  
+    CONF_WEB_SEARCH,  
+    CONF_WEB_SEARCH_CONTEXT_SIZE,  
+    CONF_WEB_SEARCH_USER_LOCATION,  
+    CONF_EXPOSED_ENTITIES_LIMIT,  
+    DOMAIN,  
+    RECOMMENDED_CHAT_MODEL,  
+    RECOMMENDED_MAX_TOKENS,  
+    RECOMMENDED_REASONING_EFFORT,  
+    RECOMMENDED_TEMPERATURE,  
+    RECOMMENDED_TOP_P,  
+    RECOMMENDED_WEB_SEARCH,  
+    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
+    RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
+    RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
 )  
 from .utils import APIVersionManager, AzureOpenAILogger, AzureOpenAIValidator  
   
@@ -55,146 +60,167 @@ _LOG = AzureOpenAILogger(__name__)
 DEFAULT_API_VERSION = "2025-03-01-preview"  
   
 STEP_USER_SCHEMA = vol.Schema(  
-  {  
-    vol.Required(CONF_API_KEY): str,  
-    vol.Required(CONF_API_BASE): str,  
-    vol.Required(CONF_CHAT_MODEL, default=RECOMMENDED_CHAT_MODEL): str,  
-    vol.Optional(CONF_API_VERSION, default=DEFAULT_API_VERSION): str,  
-  }  
+    {  
+        vol.Required(CONF_API_KEY): str,  
+        vol.Required(CONF_API_BASE): str,  
+        vol.Required(CONF_CHAT_MODEL, default=RECOMMENDED_CHAT_MODEL): str,  
+        vol.Optional(CONF_API_VERSION, default=DEFAULT_API_VERSION): str,  
+    }  
 )  
+  
   
 # -----------------------------------------------------------------------------  
 class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):  
-  VERSION = 2  
+    """Handle a config flow for Azure OpenAI SDK Conversation."""  
   
-  def __init__(self) -> None:  
-    self._validated: dict[str, Any] | None = None  
-    self._sampling_caps: dict[str, dict[str, Any]] = {}  
-    self._step1_data: dict[str, Any] | None = None  
+    VERSION = 2  
+    MINOR_VERSION = 1  # Aggiunto per supporto versioning migliorato  
   
-  # --------------------------------------------------------------------- STEP 1  
-  async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
-    if user_input is None:  
-      return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)  
+    def __init__(self) -> None:  
+        """Initialize the config flow."""  
+        self._validated: dict[str, Any] | None = None  
+        self._sampling_caps: dict[str, dict[str, Any]] = {}  
+        self._step1_data: dict[str, Any] | None = None  
   
-    self._step1_data = {  
-      CONF_API_KEY: user_input[CONF_API_KEY],  
-      CONF_API_BASE: user_input[CONF_API_BASE].strip(),  
-      CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),  
-      CONF_API_VERSION: user_input.get(CONF_API_VERSION, DEFAULT_API_VERSION).strip(),  
-    }  
+    # --------------------------------------------------------------------- STEP 1  
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
+        """Handle the initial step. Validates credentials and fetches capabilities."""  
+        if user_input is None:  
+            return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)  
   
-    errors: dict[str, str] = {}  
+        self._step1_data = {  
+            CONF_API_KEY: user_input[CONF_API_KEY],  
+            CONF_API_BASE: user_input[CONF_API_BASE].strip(),  
+            CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),  
+            CONF_API_VERSION: user_input.get(CONF_API_VERSION, DEFAULT_API_VERSION).strip(),  
+        }  
   
-    # ------------ VALIDAZIONE CON RETRY --------------------------------  
-    validator = AzureOpenAIValidator(  
-      self.hass,  
-      self._step1_data[CONF_API_KEY],  
-      self._step1_data[CONF_API_BASE],  
-      self._step1_data[CONF_CHAT_MODEL],  
-      _LOG,  
-    )  
+        errors: dict[str, str] = {}  
   
-    try:  
-      self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])  
-      self._sampling_caps = await validator.capabilities()  
-    except Exception as err:  # pylint: disable=broad-except  
-      _LOGGER.exception("Validation failed: %s", err)  
-      # Heuristica di mapping semplice per UI  
-      emsg = str(err).lower()  
-      if "401" in emsg or "forbidden" in emsg or "unauthorized" in emsg or "invalid api key" in emsg:  
-        errors["base"] = "invalid_auth"  
-      elif "not found" in emsg or "deployment" in emsg or "404" in emsg:  
-        errors["base"] = "invalid_deployment"  
-      elif "timeout" in emsg or "connect" in emsg or "network" in emsg:  
-        errors["base"] = "cannot_connect"  
-      else:  
-        errors["base"] = "unknown"  
-  
-    if errors:  
-      return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)  
-  
-    return await self.async_step_params()  
-  
-  # ------------------------------------------------------------------ STEP 2  
-  async def async_step_params(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
-    assert self._step1_data is not None  
-  
-    cap_schema: VolDictType = {}  
-  
-    # build dynamic schema from capabilities  
-    def _num_selector(meta: dict[str, Any]) -> NumberSelector:  
-      return NumberSelector(  
-        NumberSelectorConfig(  
-          min=meta.get("min", 0),  
-          max=meta.get("max", 2),  
-          step=meta.get("step", 0.05) or 0.05,  
+        # ------------ VALIDAZIONE CON RETRY --------------------------------  
+        validator = AzureOpenAIValidator(  
+            self.hass,  
+            self._step1_data[CONF_API_KEY],  
+            self._step1_data[CONF_API_BASE],  
+            self._step1_data[CONF_CHAT_MODEL],  
+            _LOG,  
         )  
-      )  
   
-    for name, meta in self._sampling_caps.items():  
-      default = meta.get("default")  
-      if isinstance(default, (int, float)):  
-        cap_schema[vol.Optional(name, default=default)] = _num_selector(meta)  
-      else:  
-        cap_schema[vol.Optional(name, default=default)] = str  
+        try:  
+            self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])  
+            self._sampling_caps = await validator.capabilities()  
+        except Exception as err:  # pylint: disable=broad-except  
+            _LOGGER.exception("Validation failed: %s", err)  
+            # Heuristica di mapping migliorata per UI  
+            emsg = str(err).lower()  
+            if any(x in emsg for x in ["401", "403", "forbidden", "unauthorized", "invalid api key"]):  
+                errors["base"] = "invalid_auth"  
+            elif any(x in emsg for x in ["not found", "deployment", "404"]):  
+                errors["base"] = "invalid_deployment"  
+            elif any(x in emsg for x in ["timeout", "connect", "network"]):  
+                errors["base"] = "cannot_connect"  
+            else:  
+                errors["base"] = "unknown"  
   
-    if not cap_schema:  
-      # nothing extra to ask  
-      return self._create_entry(options={})  
+        if errors:  
+            return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)  
   
-    errors: dict[str, str] = {}  
-    if user_input is not None:  
-      # type-cast numbers  
-      cleaned = {}  
-      for fld, val in user_input.items():  
-        if fld in self._sampling_caps:  
-          meta = self._sampling_caps[fld]  
-          if isinstance(meta.get("default"), (int, float)):  
-            try:  
-              cleaned[fld] = float(val) if "." in str(val) else int(val)  
-            except Exception:  # pylint: disable=broad-except  
-              errors[fld] = "invalid_number"  
-          else:  
-            cleaned[fld] = val  
-      if not errors:  
-        return self._create_entry(options=cleaned)  
-      return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema), errors=errors)  
+        return await self.async_step_params()  
+  
+    # ------------------------------------------------------------------ STEP 2  
+    async def async_step_params(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
+        """Handle parameter configuration step with dynamic schema based on capabilities."""  
+        assert self._step1_data is not None  
+  
+        cap_schema: VolDictType = {}  
+  
+        # build dynamic schema from capabilities  
+        def _num_selector(meta: dict[str, Any]) -> NumberSelector:  
+            return NumberSelector(  
+                NumberSelectorConfig(  
+                    min=meta.get("min", 0),  
+                    max=meta.get("max", 2),  
+                    step=meta.get("step", 0.05) or 0.05,  
+                    mode="box",  # UI migliorata  
+                )  
+            )  
+  
+        for name, meta in self._sampling_caps.items():  
+            default = meta.get("default")  
+            if isinstance(default, (int, float)):  
+                cap_schema[vol.Optional(name, default=default)] = _num_selector(meta)  
+            else:  
+                cap_schema[vol.Optional(name, default=default)] = str  
+  
+        if not cap_schema:  
+            # nothing extra to ask  
+            return self._create_entry(options={})  
+  
+        errors: dict[str, str] = {}  
+        if user_input is not None:  
+            # type-cast numbers con validazione migliorata  
+            cleaned: dict[str, Any] = {}  
+            for fld, val in user_input.items():  
+                if fld in self._sampling_caps:  
+                    meta = self._sampling_caps[fld]  
+                    if isinstance(meta.get("default"), (int, float)):  
+                        try:  
+                            sval = str(val)  
+                            num_val = float(sval) if "." in sval else int(sval)  
+                            min_val = meta.get("min", 0)  
+                            max_val = meta.get("max", float("inf"))  
+                            if num_val < min_val or num_val > max_val:  
+                                errors[fld] = "value_out_of_range"  
+                            else:  
+                                cleaned[fld] = num_val  
+                        except (ValueError, TypeError):  
+                            errors[fld] = "invalid_number"  
+                    else:  
+                        cleaned[fld] = val  
+  
+            if not errors:  
+                return self._create_entry(options=cleaned)  
+  
+            return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema), errors=errors)  
+  
+        return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema))  
   
     # ---------------------------------------------------------------- create  
-  def _create_entry(self, *, options: Mapping[str, Any]) -> ConfigFlowResult:  
-    assert self._step1_data is not None  
-    assert self._validated is not None  
+    def _create_entry(self, *, options: Mapping[str, Any]) -> ConfigFlowResult:  
+        """Create the config entry with defaults and dynamic options."""  
+        assert self._step1_data is not None  
+        assert self._validated is not None  
   
-    unique_id = (  
-      f"{normalize_azure_endpoint(self._step1_data[CONF_API_BASE])}"  
-      f"::{self._step1_data[CONF_CHAT_MODEL]}"  
-    )  
-    self.async_set_unique_id(unique_id)  
-    self._abort_if_unique_id_configured()  
+        unique_id = (  
+            f"{normalize_azure_endpoint(self._step1_data[CONF_API_BASE])}"  
+            f"::{self._step1_data[CONF_CHAT_MODEL]}"  
+        )  
+        self.async_set_unique_id(unique_id)  
+        self._abort_if_unique_id_configured()  
   
-    base_opts = {  
-      CONF_RECOMMENDED: False,  
-      CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,  
-      CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,  
-      "token_param": self._validated["token_param"],  
-      CONF_API_VERSION: self._validated["api_version"],  
-      CONF_EXPOSED_ENTITIES_LIMIT: RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
-    }  
-    base_opts.update(options)  
+        base_opts: dict[str, Any] = {  
+            CONF_RECOMMENDED: False,  
+            CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,  
+            CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,  
+            "token_param": self._validated["token_param"],  
+            CONF_API_VERSION: self._validated["api_version"],  
+            CONF_EXPOSED_ENTITIES_LIMIT: RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+        }  
+        base_opts.update(options)  
   
-    return self.async_create_entry(  
-      title=f"Azure OpenAI – {self._step1_data[CONF_CHAT_MODEL]}",  
-      data={  
-        CONF_API_KEY: self._step1_data[CONF_API_KEY],  
-        CONF_API_BASE: self._step1_data[CONF_API_BASE],  
-        CONF_CHAT_MODEL: self._step1_data[CONF_CHAT_MODEL],  
-      },  
-      options=base_opts,  
-    )  
+        return self.async_create_entry(  
+            title=f"Azure OpenAI – {self._step1_data[CONF_CHAT_MODEL]}",  
+            data={  
+                CONF_API_KEY: self._step1_data[CONF_API_KEY],  
+                CONF_API_BASE: self._step1_data[CONF_API_BASE],  
+                CONF_CHAT_MODEL: self._step1_data[CONF_CHAT_MODEL],  
+            },  
+            options=base_opts,  
+        )  
   
-  # ---------------------------------------------------------------- options  
-  @staticmethod  
-  def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:  # noqa: D401  
-    from .options_flow import AzureOpenAIOptionsFlow  # lazy import to cut deps  
-    return AzureOpenAIOptionsFlow(config_entry)  
+    # ---------------------------------------------------------------- options  
+    @staticmethod  
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:  # noqa: D401  
+        from .options_flow import AzureOpenAIOptionsFlow  # lazy import to cut deps  
+  
+        return AzureOpenAIOptionsFlow(config_entry)  
