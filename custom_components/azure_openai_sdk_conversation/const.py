@@ -1,4 +1,3 @@
-# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py  
 """Costanti per l'integrazione Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
@@ -36,6 +35,23 @@ CONF_WEB_SEARCH_USER_LOCATION: Final[str] = "web_search_user_location"
   
 # Flag per UI/flow (es. schema "preset consigliato")  
 CONF_RECOMMENDED: Final[str] = "recommended"  
+  
+# Impostazioni log  
+CONF_LOG_LEVEL: Final[str] = "log_level"  # none | error | info | trace  
+CONF_LOG_PAYLOAD_REQUEST: Final[str] = "log_payload_request"  
+CONF_LOG_PAYLOAD_RESPONSE: Final[str] = "log_payload_response"  
+CONF_LOG_SYSTEM_MESSAGE: Final[str] = "log_system_message"  
+CONF_LOG_MAX_PAYLOAD_CHARS: Final[str] = "log_max_payload_chars"  
+CONF_LOG_MAX_SSE_LINES: Final[str] = "log_max_sse_lines"  
+  
+LOG_LEVEL_NONE: Final[str] = "none"  
+LOG_LEVEL_ERROR: Final[str] = "error"  
+LOG_LEVEL_INFO: Final[str] = "info"  
+LOG_LEVEL_TRACE: Final[str] = "trace"  
+  
+DEFAULT_LOG_LEVEL: Final[str] = LOG_LEVEL_ERROR  
+DEFAULT_LOG_MAX_PAYLOAD_CHARS: Final[int] = 12000  
+DEFAULT_LOG_MAX_SSE_LINES: Final[int] = 10  
   
 # Chiavi errori per UI/config flow  
 ERROR_CANNOT_CONNECT: Final[str] = "cannot_connect"  
@@ -100,6 +116,20 @@ __all__ = [
     "CONF_WEB_SEARCH_CONTEXT_SIZE",  
     "CONF_WEB_SEARCH_USER_LOCATION",  
     "CONF_RECOMMENDED",  
+    # Logging  
+    "CONF_LOG_LEVEL",  
+    "CONF_LOG_PAYLOAD_REQUEST",  
+    "CONF_LOG_PAYLOAD_RESPONSE",  
+    "CONF_LOG_SYSTEM_MESSAGE",  
+    "CONF_LOG_MAX_PAYLOAD_CHARS",  
+    "CONF_LOG_MAX_SSE_LINES",  
+    "LOG_LEVEL_NONE",  
+    "LOG_LEVEL_ERROR",  
+    "LOG_LEVEL_INFO",  
+    "LOG_LEVEL_TRACE",  
+    "DEFAULT_LOG_LEVEL",  
+    "DEFAULT_LOG_MAX_PAYLOAD_CHARS",  
+    "DEFAULT_LOG_MAX_SSE_LINES",  
     # Error keys  
     "ERROR_CANNOT_CONNECT",  
     "ERROR_INVALID_AUTH",  

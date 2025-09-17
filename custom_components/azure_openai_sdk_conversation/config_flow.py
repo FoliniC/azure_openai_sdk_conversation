@@ -1,4 +1,3 @@
-# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/config_flow.py  
 """Config flow for Azure OpenAI SDK Conversation – versione 2025.9+."""  
 from __future__ import annotations  
   
@@ -17,6 +16,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm  
 from homeassistant.helpers.httpx_client import get_async_client  # noqa: F401  
 from homeassistant.helpers.selector import (  
+    BooleanSelector,  
     NumberSelector,  
     NumberSelectorConfig,  
     SelectSelector,  
@@ -51,6 +51,20 @@ from .const import (
     RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
     RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+    # logging  
+    CONF_LOG_LEVEL,  
+    CONF_LOG_PAYLOAD_REQUEST,  
+    CONF_LOG_PAYLOAD_RESPONSE,  
+    CONF_LOG_SYSTEM_MESSAGE,  
+    CONF_LOG_MAX_PAYLOAD_CHARS,  
+    CONF_LOG_MAX_SSE_LINES,  
+    DEFAULT_LOG_LEVEL,  
+    DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
+    DEFAULT_LOG_MAX_SSE_LINES,  
+    LOG_LEVEL_NONE,  
+    LOG_LEVEL_ERROR,  
+    LOG_LEVEL_INFO,  
+    LOG_LEVEL_TRACE,  
 )  
 from .utils import APIVersionManager, AzureOpenAILogger, AzureOpenAIValidator  
   
@@ -67,7 +81,6 @@ STEP_USER_SCHEMA = vol.Schema(
         vol.Optional(CONF_API_VERSION, default=DEFAULT_API_VERSION): str,  
     }  
 )  
-  
   
 # -----------------------------------------------------------------------------  
 class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):  
@@ -152,6 +165,23 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             else:  
                 cap_schema[vol.Optional(name, default=default)] = str  
   
+        # Aggiunta impostazioni di log (manteniamo UI coerente)  
+        cap_schema[vol.Optional(CONF_LOG_LEVEL, default=DEFAULT_LOG_LEVEL)] = SelectSelector(  
+            SelectSelectorConfig(  
+                options=[LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_TRACE],  
+                mode=SelectSelectorMode.DROPDOWN,  
+            )  
+        )  
+        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_REQUEST, default=False)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_RESPONSE, default=False)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_LOG_SYSTEM_MESSAGE, default=False)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_LOG_MAX_PAYLOAD_CHARS, default=DEFAULT_LOG_MAX_PAYLOAD_CHARS)] = NumberSelector(  
+            NumberSelectorConfig(min=100, max=500000, step=100, mode="box")  
+        )  
+        cap_schema[vol.Optional(CONF_LOG_MAX_SSE_LINES, default=DEFAULT_LOG_MAX_SSE_LINES)] = NumberSelector(  
+            NumberSelectorConfig(min=1, max=200, step=1, mode="box")  
+        )  
+  
         if not cap_schema:  
             # nothing extra to ask  
             return self._create_entry(options={})  
@@ -177,6 +207,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                             errors[fld] = "invalid_number"  
                     else:  
                         cleaned[fld] = val  
+                else:  
+                    # Opzioni extra (log, ecc.) copiate così come sono  
+                    cleaned[fld] = val  
   
             if not errors:  
                 return self._create_entry(options=cleaned)  
@@ -198,13 +231,38 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self.async_set_unique_id(unique_id)  
         self._abort_if_unique_id_configured()  
   
+        # Calcolo robusto del token_param iniziale per Chat:  
+        # - gpt-5 / gpt-4.1 / gpt-4.2 => max_completion_tokens  
+        # - altri => in base alla api-version (>= 2025-03 => max_completion_tokens, altrimenti max_tokens)  
+        def _ver_date_tuple(ver: str) -> tuple[int, int, int]:  
+            core = (ver or "").split("-preview")[0]  
+            parts = core.split("-")  
+            try:  
+                return (int(parts[0]), int(parts[1]), int(parts[2]))  
+            except Exception:  # noqa: BLE001  
+                return (1900, 1, 1)  
+  
+        model_l = (self._step1_data[CONF_CHAT_MODEL] or "").lower()  
+        if model_l.startswith("gpt-5") or model_l.startswith("gpt-4.1") or model_l.startswith("gpt-4.2"):  
+            chat_token_param = "max_completion_tokens"  
+        else:  
+            y, m, d = _ver_date_tuple(self._validated["api_version"])  
+            chat_token_param = "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"  
+  
         base_opts: dict[str, Any] = {  
             CONF_RECOMMENDED: False,  
             CONF_PROMPT: llm.DEFAULT_INSTRUCTIONS_PROMPT,  
             CONF_MAX_TOKENS: RECOMMENDED_MAX_TOKENS,  
-            "token_param": self._validated["token_param"],  
+            "token_param": chat_token_param,  
             CONF_API_VERSION: self._validated["api_version"],  
             CONF_EXPOSED_ENTITIES_LIMIT: RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+            # default logging options  
+            CONF_LOG_LEVEL: DEFAULT_LOG_LEVEL,  
+            CONF_LOG_PAYLOAD_REQUEST: False,  
+            CONF_LOG_PAYLOAD_RESPONSE: False,  
+            CONF_LOG_SYSTEM_MESSAGE: False,  
+            CONF_LOG_MAX_PAYLOAD_CHARS: DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
+            CONF_LOG_MAX_SSE_LINES: DEFAULT_LOG_MAX_SSE_LINES,  
         }  
         base_opts.update(options)  
   

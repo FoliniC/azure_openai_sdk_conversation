@@ -1,4 +1,3 @@
-# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/conversation.py  
 """Conversation provider for Azure OpenAI with optional web-search context."""  
 from __future__ import annotations  
   
@@ -30,6 +29,20 @@ from .const import (
     CONF_WEB_SEARCH_CONTEXT_SIZE,  
     CONF_WEB_SEARCH_USER_LOCATION,  
     RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
+    # logging  
+    CONF_LOG_LEVEL,  
+    CONF_LOG_PAYLOAD_REQUEST,  
+    CONF_LOG_PAYLOAD_RESPONSE,  
+    CONF_LOG_SYSTEM_MESSAGE,  
+    CONF_LOG_MAX_PAYLOAD_CHARS,  
+    CONF_LOG_MAX_SSE_LINES,  
+    DEFAULT_LOG_LEVEL,  
+    DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
+    DEFAULT_LOG_MAX_SSE_LINES,  
+    LOG_LEVEL_NONE,  
+    LOG_LEVEL_ERROR,  
+    LOG_LEVEL_INFO,  
+    LOG_LEVEL_TRACE,  
 )  
   
 DOMAIN = "azure_openai_sdk_conversation"  
@@ -86,6 +99,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             "Cache-Control": "no-cache",  
         }  
   
+        # Impostazioni logging  
+        self._log_level: str = str(conf.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL)).strip().lower()  
+        self._log_payload_request: bool = bool(conf.get(CONF_LOG_PAYLOAD_REQUEST, False))  
+        self._log_payload_response: bool = bool(conf.get(CONF_LOG_PAYLOAD_RESPONSE, False))  
+        self._log_system_message: bool = bool(conf.get(CONF_LOG_SYSTEM_MESSAGE, False))  
+        self._log_max_payload_chars: int = self._coerce_int(conf.get(CONF_LOG_MAX_PAYLOAD_CHARS), DEFAULT_LOG_MAX_PAYLOAD_CHARS)  
+        self._log_max_sse_lines: int = self._coerce_int(conf.get(CONF_LOG_MAX_SSE_LINES), DEFAULT_LOG_MAX_SSE_LINES)  
+  
         # Debug SSE  
         self._debug_sse: bool = self._coerce_bool(conf.get(CONF_DEBUG_SSE), False)  
         self._debug_sse_lines: int = self._coerce_int(conf.get(CONF_DEBUG_SSE_LINES), 10)  
@@ -99,6 +120,55 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 endpoint=conf.get(CONF_BING_ENDPOINT, WebSearchClient.BING_ENDPOINT_DEFAULT),  
                 max_results=self._coerce_int(conf.get(CONF_BING_MAX), 5),  
             )  
+  
+    # -------------------- helpers: logging wrappers --------------------  
+    @property  
+    def _lvl(self) -> int:  
+        if self._log_level == LOG_LEVEL_TRACE:  
+            return 3  
+        if self._log_level == LOG_LEVEL_INFO:  
+            return 2  
+        if self._log_level == LOG_LEVEL_ERROR:  
+            return 1  
+        return 0  # none  
+  
+    def _log_debug(self, msg: str, *args: Any) -> None:  
+        if self._lvl >= 3:  
+            _LOGGER.debug(msg, *args)  
+  
+    def _log_info(self, msg: str, *args: Any) -> None:  
+        if self._lvl >= 2:  
+            _LOGGER.info(msg, *args)  
+  
+    def _log_warn(self, msg: str, *args: Any) -> None:  
+        if self._lvl >= 1:  
+            _LOGGER.warning(msg, *args)  
+  
+    def _log_error(self, msg: str, *args: Any) -> None:  
+        if self._lvl >= 1:  
+            _LOGGER.error(msg, *args)  
+  
+    def _should_log_payload_request(self) -> bool:  
+        return self._lvl >= 2 and self._log_payload_request  
+  
+    def _should_log_payload_response(self) -> bool:  
+        return self._lvl >= 2 and self._log_payload_response  
+  
+    def _should_log_system_message(self) -> bool:  
+        return self._lvl >= 2 and self._log_system_message  
+  
+    @staticmethod  
+    def _safe_json(obj: Any, max_len: int = 12000) -> str:  
+        try:  
+            s = json.dumps(obj, ensure_ascii=False)  
+        except Exception:  
+            try:  
+                s = str(obj)  
+            except Exception:  
+                s = "<unserializable>"  
+        if len(s) > max_len:  
+            return f"{s[:max_len]}... (truncated)"  
+        return s  
   
     # -------------------- helpers: coercion --------------------  
     @staticmethod  
@@ -172,6 +242,21 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         m = self._ver_date_tuple(minimum)  
         return ver if v >= m else minimum  
   
+    # -------------------- token param helpers --------------------  
+    def _chat_token_param_initial(self) -> str:  
+        """Determina il parametro token iniziale per Chat, evitando un primo tentativo errato."""  
+        # 1) Preferisci quanto validato/salvato in config (se disponibile)  
+        tp = str(self._conf.get("token_param") or "").strip()  
+        if tp in ("max_tokens", "max_completion_tokens"):  
+            return tp  
+        # 2) Euristica per famiglie di modelli recenti che richiedono max_completion_tokens anche su 2025-01  
+        model = (self._deployment or "").lower()  
+        if model.startswith("gpt-5") or model.startswith("gpt-4.1") or model.startswith("gpt-4.2"):  
+            return "max_completion_tokens"  
+        # 3) Fallback alla regola per api-version  
+        y, m, d = self._ver_date_tuple(self._api_version)  
+        return "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"  
+  
     # -------------------- entity collection --------------------  
     def _collect_exposed_entities(self) -> list[dict[str, Any]]:  
         """Costruisce una lista di entità per il template: entity_id, name, state, area, aliases[]."""  
@@ -228,7 +313,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 }  
             )  
         except Exception as err:  # noqa: BLE001  
-            _LOGGER.debug("System message template render failed, will try regex fallback: %s", err)  
+            self._log_debug("System message template render failed, will try regex fallback: %s", err)  
   
         # 2) Fallback: sostituisci tutti i {{ azure.xxx }} rimasti  
         pat = re.compile(r"{{\s*azure\.([a-zA-Z0-9_]+)\s*}}")  
@@ -270,7 +355,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         token_param = (  
             _responses_token_param_for_version(effective_version_for_mode)  
             if use_responses  
-            else _chat_token_param_for_version(effective_version_for_mode)  
+            else self._chat_token_param_initial()  
         )  
   
         search_enabled = self._coerce_bool(self._conf.get(CONF_ENABLE_SEARCH) or self._conf.get(CONF_WEB_SEARCH, False), False)  
@@ -319,6 +404,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             )  
             sys_msg = f"{sys_msg}\n\n{identity_text}"  
   
+        if self._should_log_system_message():  
+            self._log_info("System prompt sent to model:\n%s", sys_msg)  
+  
         messages_chat: list[dict[str, str]] = [{"role": "system", "content": sys_msg}]  
   
         # 1) Web-search (opzionale)  
@@ -327,7 +415,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             try:  
                 search_md = await self._search.search(query)  
             except Exception as err:  # noqa: BLE001  
-                _LOGGER.warning("Web search failed: %s", err)  
+                self._log_warn("Web search failed: %s", err)  
                 search_md = ""  
             if search_md:  
                 messages_chat.append({"role": "system", "content": "Real-time web search results:\n\n" + search_md})  
@@ -335,7 +423,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         # 2) Messaggio utente  
         messages_chat.append({"role": "user", "content": user_input.text})  
   
-        _LOGGER.debug(  
+        self._log_debug(  
             "Starting conversation using %s API (deployment=%s, api-version configured=%s)",  
             "Responses" if use_responses else "Chat",  
             self._deployment,  
@@ -377,7 +465,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         break  
                     attempted.add(pair_key)  
   
-                    _LOGGER.debug(  
+                    self._log_debug(  
                         "Calling Responses API api-version=%s with token param=%s (format=%s, stream)",  
                         next_version,  
                         res_token_param,  
@@ -398,6 +486,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     else:  
                         payload["input"] = _to_input(messages_chat)  
   
+                    if self._should_log_payload_request():  
+                        self._log_info("Request payload (Responses %s): %s", fmt, self._safe_json(payload, self._log_max_payload_chars))  
+  
                     async with self._http.stream(  
                         "POST",  
                         url,  
@@ -414,31 +505,31 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                             except Exception:  
                                 err_json = {}  
                             msg = err_json.get("error", {}).get("message") or text_body or f"HTTP {resp.status_code}"  
-                            _LOGGER.error("Azure responses stream error: %s", msg)  
+                            self._log_error("Azure responses stream error: %s", msg)  
   
                             # Retry: server impone 2025-03-01-preview  
                             if (  
                                 "Responses API is enabled only for api-version 2025-03-01-preview" in msg  
                                 and next_version != "2025-03-01-preview"  
                             ):  
-                                _LOGGER.debug("Retrying Responses with api-version=2025-03-01-preview")  
+                                self._log_debug("Retrying Responses with api-version=2025-03-01-preview")  
                                 next_version = "2025-03-01-preview"  
                                 res_token_param = None  
                                 continue  
   
                             # Retry: cambio parametro token  
                             if "Unsupported parameter: 'max_completion_tokens'" in msg and res_token_param != "max_output_tokens":  
-                                _LOGGER.debug("Retrying Responses switching token param to max_output_tokens")  
+                                self._log_debug("Retrying Responses switching token param to max_output_tokens")  
                                 res_token_param = "max_output_tokens"  
                                 continue  
                             if "Unsupported parameter: 'max_output_tokens'" in msg and res_token_param != "max_completion_tokens":  
-                                _LOGGER.debug("Retrying Responses switching token param to max_completion_tokens")  
+                                self._log_debug("Retrying Responses switching token param to max_completion_tokens")  
                                 res_token_param = "max_completion_tokens"  
                                 continue  
   
                             # Se errore e non abbiamo provato l'altro formato, prova "messages"  
                             if not use_messages_format:  
-                                _LOGGER.debug("Retrying Responses switching to messages+instructions format")  
+                                self._log_debug("Retrying Responses switching to messages+instructions format")  
                                 use_messages_format = True  
                                 continue  
   
@@ -450,7 +541,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         current_event: str | None = None  
                         data_lines: list[str] = []  
                         debug_samples: list[str] = []  
-                        debug_limit = self._debug_sse_lines if self._debug_sse else 0  
+                        collect_sse_samples = self._debug_sse or self._should_log_payload_response()  
+                        if collect_sse_samples:  
+                            debug_limit = self._debug_sse_lines if self._debug_sse else self._log_max_sse_lines  
+                        else:  
+                            debug_limit = 0  
   
                         async for raw_line in resp.aiter_lines():  
                             if raw_line is None:  
@@ -515,7 +610,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                                 ):  
                                     _consume(payload_obj.get("delta") or payload_obj)  
                                 elif event_name in ("response.error",):  
-                                    _LOGGER.error("Azure responses error event: %s", payload_obj)  
+                                    self._log_error("Azure responses error event: %s", payload_obj)  
                                     break  
                                 elif event_name in (  
                                     "response.completed",  
@@ -550,7 +645,6 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                                 payload_obj = None  
   
                             if isinstance(payload_obj, dict):  
-  
                                 def _consume_tail(node: Any) -> None:  
                                     nonlocal text_out  
                                     if node is None:  
@@ -571,11 +665,10 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                                         _consume_tail(node.get("message"))  
                                         _consume_tail(node.get("data"))  
                                         _consume_tail(node.get("delta"))  
-  
                                 _consume_tail(payload_obj)  
   
-                        if debug_samples:  
-                            _LOGGER.debug(  
+                        if debug_samples and collect_sse_samples:  
+                            self._log_info(  
                                 "Responses SSE sample (first %d messages):\n%s",  
                                 len(debug_samples),  
                                 "\n".join(debug_samples),  
@@ -583,7 +676,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
   
                         # Se non è uscito testo, prova formato alternativo prima, poi eventualmente fallback  
                         if not text_out and not use_messages_format:  
-                            _LOGGER.debug(  
+                            self._log_debug(  
                                 "Responses stream produced no text, retrying with messages+instructions format"  
                             )  
                             use_messages_format = True  
@@ -594,21 +687,25 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
   
                 # Fallback automatico: se non è arrivato testo, tenta una chiamata NON-streaming Responses  
                 if not text_out:  
-                    _LOGGER.debug(  
+                    self._log_debug(  
                         "Responses stream produced no text; trying non-stream Responses (format=%s)",  
                         "messages" if use_messages_format else "input",  
                     )  
                     text_out = await self._responses_non_stream(messages_chat, sys_msg, next_version, use_messages_format)  
   
-                    # Se ancora vuoto, e modalità 'auto' ma il modello NON è 'o*', si prova Chat  
-                    if not text_out and self._force_mode == "auto" and not (self._deployment or "").lower().startswith("o"):  
-                        _LOGGER.debug("Responses non-stream produced no text; falling back to Chat Completions")  
-                        text_out = await self._chat_completions_fallback(messages_chat)  
+                # Se ancora vuoto, e modalità 'auto' ma il modello NON è 'o*', si prova Chat  
+                if not text_out and self._force_mode == "auto" and not (self._deployment or "").lower().startswith("o"):  
+                    self._log_debug("Responses non-stream produced no text; falling back to Chat Completions")  
+                    text_out = await self._chat_completions_fallback(messages_chat)  
             else:  
                 # Forza Chat immediatamente  
                 text_out = await self._chat_completions_fallback(messages_chat)  
         except Exception as err:  # noqa: BLE001  
-            _LOGGER.error("Azure conversation processing failed: %s", err)  
+            self._log_error("Azure conversation processing failed: %s", err)  
+  
+        # Logga testo risposta finale (se richiesto)  
+        if self._should_log_payload_response() and text_out:  
+            self._log_info("Response text: %s", text_out)  
   
         # IntentResponse per HA  
         response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))  
@@ -656,6 +753,13 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         else:  
             payload["input"] = _to_input(messages_chat)  
   
+        if self._should_log_payload_request():  
+            self._log_info(  
+                "Request payload (Responses non-stream %s): %s",  
+                "messages" if use_messages_format else "input",  
+                self._safe_json(payload, self._log_max_payload_chars),  
+            )  
+  
         try:  
             resp = await self._http.post(  
                 url,  
@@ -665,7 +769,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 timeout=self._timeout,  
             )  
         except Exception as err:  # noqa: BLE001  
-            _LOGGER.error("Azure responses (non-stream) request failed: %s", err)  
+            self._log_error("Azure responses (non-stream) request failed: %s", err)  
             return ""  
   
         if resp.status_code >= 400:  
@@ -675,7 +779,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             except Exception:  
                 err_json = {}  
             msg = err_json.get("error", {}).get("message") or text_body.decode("utf-8", "ignore") or f"HTTP {resp.status_code}"  
-            _LOGGER.error("Azure responses (non-stream) error: %s", msg)  
+            self._log_error("Azure responses (non-stream) error: %s", msg)  
             return ""  
   
         # Estrazione generica di tutto il testo  
@@ -687,9 +791,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             except Exception:  
                 obj = None  
   
+        if self._should_log_payload_response() and obj is not None:  
+            self._log_info("Response payload (Responses non-stream): %s", self._safe_json(obj, self._log_max_payload_chars))  
+  
         if not isinstance(obj, dict):  
             return ""  
-  
         out_parts: list[str] = []  
   
         def _acc(node: Any) -> None:  
@@ -714,7 +820,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
   
         _acc(obj)  
         text = "".join(out_parts).strip()  
-        _LOGGER.debug("Responses non-stream extracted %d chars", len(text))  
+        self._log_debug("Responses non-stream extracted %d chars", len(text))  
         return text  
   
     async def _chat_completions_fallback(self, messages_chat: list[dict[str, str]]) -> str:  
@@ -726,7 +832,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         text_out = ""  
         url = f"{self._endpoint}/openai/deployments/{self._deployment}/chat/completions"  
         next_version = self._api_version  
-        token_param = _chat_token_param_for_version(next_version)  
+        token_param = self._chat_token_param_initial()  
         attempted: set[str] = set()  
   
         while True:  
@@ -742,11 +848,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 token_param: self._coerce_int(self._conf.get("max_tokens"), 1024),  
             }  
   
-            _LOGGER.debug(  
+            self._log_debug(  
                 "Calling Chat Completions api-version=%s with token param=%s",  
                 next_version,  
                 token_param,  
             )  
+  
+            if self._should_log_payload_request():  
+                self._log_info("Request payload (Chat Completions): %s", self._safe_json(payload, self._log_max_payload_chars))  
   
             async with self._http.stream(  
                 "POST",  
@@ -764,21 +873,21 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     except Exception:  
                         err_json = {}  
                     msg = err_json.get("error", {}).get("message") or txt or f"HTTP {resp.status_code}"  
-                    _LOGGER.error("Azure chat stream error: %s", msg)  
+                    self._log_error("Azure chat stream error: %s", msg)  
   
                     # Retry cambio parametro  
                     if "Unsupported parameter: 'max_tokens'" in msg and token_param != "max_completion_tokens":  
-                        _LOGGER.debug("Retrying Chat switching token param to max_completion_tokens")  
+                        self._log_debug("Retrying Chat switching token param to max_completion_tokens")  
                         token_param = "max_completion_tokens"  
                         continue  
                     if "Unsupported parameter: 'max_completion_tokens'" in msg and token_param != "max_tokens":  
-                        _LOGGER.debug("Retrying Chat switching token param to max_tokens")  
+                        self._log_debug("Retrying Chat switching token param to max_tokens")  
                         token_param = "max_tokens"  
                         continue  
   
                     # Retry API version richiesta (caso raro per chat)  
                     if ("api-version 2025-03-01-preview" in msg) and next_version != "2025-03-01-preview":  
-                        _LOGGER.debug("Retrying Chat with api-version=2025-03-01-preview")  
+                        self._log_debug("Retrying Chat with api-version=2025-03-01-preview")  
                         next_version = "2025-03-01-preview"  
                         token_param = _chat_token_param_for_version(next_version)  
                         continue  
@@ -786,6 +895,13 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     break  
   
                 # Stream OK  
+                sse_samples: list[str] = []  
+                collect_samples = self._should_log_payload_response() or self._debug_sse  
+                if collect_samples:  
+                    debug_limit = self._debug_sse_lines if self._debug_sse else self._log_max_sse_lines  
+                else:  
+                    debug_limit = 0  
+  
                 async for raw_line in resp.aiter_lines():  
                     if not raw_line:  
                         continue  
@@ -796,6 +912,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         continue  
   
                     data_str = line[5:].lstrip()  
+                    if collect_samples and debug_limit > 0 and len(sse_samples) < debug_limit and data_str and data_str != "[DONE]":  
+                        sse_samples.append(data_str[:500])  
+  
                     if not data_str or data_str == "[DONE]":  
                         break  
                     try:  
@@ -814,6 +933,8 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     except Exception:  
                         continue  
   
+                if sse_samples and collect_samples:  
+                    self._log_info("Chat Completions SSE sample (first %d lines):\n%s", len(sse_samples), "\n".join(sse_samples))  
             break  
   
         return text_out  

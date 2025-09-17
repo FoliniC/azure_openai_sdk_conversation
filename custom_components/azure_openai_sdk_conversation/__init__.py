@@ -12,6 +12,18 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.httpx_client import get_async_client  
   
 from .utils import APIVersionManager, redact_api_key  
+from .const import (  
+    # logging constants used for informative log  
+    CONF_LOG_LEVEL,  
+    CONF_LOG_PAYLOAD_REQUEST,  
+    CONF_LOG_PAYLOAD_RESPONSE,  
+    CONF_LOG_SYSTEM_MESSAGE,  
+    CONF_LOG_MAX_PAYLOAD_CHARS,  
+    CONF_LOG_MAX_SSE_LINES,  
+    DEFAULT_LOG_LEVEL,  
+    DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
+    DEFAULT_LOG_MAX_SSE_LINES,  
+)  
   
 DOMAIN = "azure_openai_sdk_conversation"  
 PLATFORMS = [Platform.CONVERSATION]  
@@ -36,6 +48,11 @@ def normalize_azure_endpoint(value: str | None) -> str:
         return f"{scheme}://{host}{port}"  
     except Exception:  
         return s.rstrip("/")  
+  
+  
+async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:  
+    """Reload the integration when options are updated."""  
+    await hass.config_entries.async_reload(entry.entry_id)  
   
   
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:  
@@ -94,6 +111,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.runtime_data = None  # type: ignore[attr-defined]  
     except Exception:  
         pass  
+  
+    # Informational log about current logging configuration  
+    opts = entry.options  
+    log_level = opts.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL)  
+    log_req = bool(opts.get(CONF_LOG_PAYLOAD_REQUEST, False))  
+    log_res = bool(opts.get(CONF_LOG_PAYLOAD_RESPONSE, False))  
+    log_sys = bool(opts.get(CONF_LOG_SYSTEM_MESSAGE, False))  
+    max_chars = int(opts.get(CONF_LOG_MAX_PAYLOAD_CHARS, DEFAULT_LOG_MAX_PAYLOAD_CHARS))  
+    max_sse = int(opts.get(CONF_LOG_MAX_SSE_LINES, DEFAULT_LOG_MAX_SSE_LINES))  
+    debug_sse = bool(opts.get("debug_sse", False))  
+    debug_sse_lines = int(opts.get("debug_sse_lines", 10))  
+  
+    _LOGGER.info(  
+        "Azure OpenAI conversation logging config: level=%s, request=%s, response=%s, system=%s, max_payload_chars=%s, max_sse_lines=%s, debug_sse=%s, debug_sse_lines=%s",  
+        log_level,  
+        log_req,  
+        log_res,  
+        log_sys,  
+        max_chars,  
+        max_sse,  
+        debug_sse,  
+        debug_sse_lines,  
+    )  
+  
+    # Reload automatico al cambio opzioni  
+    entry.async_on_unload(entry.add_update_listener(_async_update_listener))  
   
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)  
     _LOGGER.debug(  

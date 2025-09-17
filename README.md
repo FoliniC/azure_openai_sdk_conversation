@@ -6,6 +6,12 @@ This is equivalent to the built-in OpenAI Conversation integration. The differen
 Configuration can be changed in options after been created.<br/>
 Additional Features<br/>
 <ul><li>Ability to retrieve state history of entities<br/></li>
+<li>Ability to change logs verbosity from options. Be sure to enable debug logs on component setting following line in configuration.yaml<br/>
+```custom_components.azure_openai_sdk_conversation: debug```<br/>
+Note: also those lines are usefull for troubleshooting:
+```    homeassistant.components.assist_pipeline: debug
+    homeassistant.components.conversation: debug```
+</li>
 <li>Ability to pass custom informations with HA template.<br/>
 <br/>
 Sample system message:<br/>

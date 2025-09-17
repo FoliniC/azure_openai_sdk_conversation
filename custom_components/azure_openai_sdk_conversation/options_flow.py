@@ -1,4 +1,3 @@
-# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/options_flow.py  
 """Options flow for Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
@@ -39,6 +38,20 @@ from .const import (
     RECOMMENDED_WEB_SEARCH,  
     RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,  
     RECOMMENDED_WEB_SEARCH_USER_LOCATION,  
+    # logging  
+    CONF_LOG_LEVEL,  
+    CONF_LOG_PAYLOAD_REQUEST,  
+    CONF_LOG_PAYLOAD_RESPONSE,  
+    CONF_LOG_SYSTEM_MESSAGE,  
+    CONF_LOG_MAX_PAYLOAD_CHARS,  
+    CONF_LOG_MAX_SSE_LINES,  
+    DEFAULT_LOG_LEVEL,  
+    DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
+    DEFAULT_LOG_MAX_SSE_LINES,  
+    LOG_LEVEL_NONE,  
+    LOG_LEVEL_ERROR,  
+    LOG_LEVEL_INFO,  
+    LOG_LEVEL_TRACE,  
 )  
 from .utils import APIVersionManager  
   
@@ -54,7 +67,33 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
   
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:  
         """Manage the options."""  
+        # Se l'utente ha inviato il form, ricalcoliamo token_param coerente con modello+versione.  
         if user_input is not None:  
+            model = (self.config_entry.data.get("chat_model") or "").lower()  
+  
+            # Determina la api-version scelta (se non fornita, usa quella corrente)  
+            chosen_version = str(  
+                user_input.get(CONF_API_VERSION)  
+                or self.config_entry.options.get(CONF_API_VERSION)  
+                or self.config_entry.data.get(CONF_API_VERSION, "2025-03-01-preview")  
+            )  
+  
+            def _ver_date_tuple(ver: str) -> tuple[int, int, int]:  
+                core = (ver or "").split("-preview")[0]  
+                parts = core.split("-")  
+                try:  
+                    return (int(parts[0]), int(parts[1]), int(parts[2]))  
+                except Exception:  # noqa: BLE001  
+                    return (1900, 1, 1)  
+  
+            if model.startswith("gpt-5") or model.startswith("gpt-4.1") or model.startswith("gpt-4.2"):  
+                token_param = "max_completion_tokens"  
+            else:  
+                y, m, d = _ver_date_tuple(chosen_version)  
+                token_param = "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"  
+  
+            # Salva anche token_param nelle opzioni per guidare il provider Chat a evitare il primo tentativo errato.  
+            user_input = {**user_input, "token_param": token_param}  
             return self.async_create_entry(title="", data=user_input)  
   
         schema = vol.Schema(  
@@ -189,6 +228,55 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                     ): BooleanSelector(),  
                 }  
             )  
+  
+        # Opzioni logging  
+        schema = schema.extend(  
+            {  
+                vol.Optional(  
+                    CONF_LOG_LEVEL,  
+                    default=self.config_entry.options.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL),  
+                ): SelectSelector(  
+                    SelectSelectorConfig(  
+                        options=[LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_TRACE],  
+                        mode=SelectSelectorMode.DROPDOWN,  
+                    )  
+                ),  
+                vol.Optional(  
+                    CONF_LOG_PAYLOAD_REQUEST,  
+                    default=self.config_entry.options.get(CONF_LOG_PAYLOAD_REQUEST, False),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_LOG_PAYLOAD_RESPONSE,  
+                    default=self.config_entry.options.get(CONF_LOG_PAYLOAD_RESPONSE, False),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_LOG_SYSTEM_MESSAGE,  
+                    default=self.config_entry.options.get(CONF_LOG_SYSTEM_MESSAGE, False),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_LOG_MAX_PAYLOAD_CHARS,  
+                    default=self.config_entry.options.get(CONF_LOG_MAX_PAYLOAD_CHARS, DEFAULT_LOG_MAX_PAYLOAD_CHARS),  
+                ): NumberSelector(  
+                    NumberSelectorConfig(  
+                        min=100,  
+                        max=500000,  
+                        step=100,  
+                        mode="box",  
+                    )  
+                ),  
+                vol.Optional(  
+                    CONF_LOG_MAX_SSE_LINES,  
+                    default=self.config_entry.options.get(CONF_LOG_MAX_SSE_LINES, DEFAULT_LOG_MAX_SSE_LINES),  
+                ): NumberSelector(  
+                    NumberSelectorConfig(  
+                        min=1,  
+                        max=200,  
+                        step=1,  
+                        mode="box",  
+                    )  
+                ),  
+            }  
+        )  
   
         return self.async_show_form(step_id="init", data_schema=schema)  
   
