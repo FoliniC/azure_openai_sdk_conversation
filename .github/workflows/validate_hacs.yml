@@ -1,4 +1,4 @@
-Pin actions/checkout and actions/setup-python to full commit SHAs for securityname: Validate HACS
+name: Validate HACS
 
 on:
   push:
@@ -11,21 +11,14 @@ on:
       - '.github/workflows/validate_hacs.yml'
 
 jobs:
-  hacs:
-    name: HACS Validation
+  validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@b80ff79f1755d06ba70441c368a6fe801f5f3a62
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c
+      - name: HACS validation
+        uses: hacs/action@main
         with:
-          python-version: 3.10
-
-      - name: Install requirements
-        run: |
-          pip install -r https://raw.githubusercontent.com/hacs/action/main/requirements.txt
-
-      - name: Run HACS validation
-        run: hacs validate
+          category: integration
+          ignore: brands
