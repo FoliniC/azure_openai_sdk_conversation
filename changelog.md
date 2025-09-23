@@ -1,5 +1,14 @@
 # CHANGELOG – Azure OpenAI SDK Conversation  
   
+## 0.3.2 – September 2025  
+Compatible with Home Assistant ≥ 2025.3  
+  
+### Highlights  
+- only exposed entity are passed to the model
+- if no response arrives in 5 seconds, ask user seconds to wait or stop
+- add vocabulary to group similar prompts
+- configuration in config flow and option flow of previous points
+
 ## 0.3.1 – September 2025  
 Compatible with Home Assistant ≥ 2025.3  
   
