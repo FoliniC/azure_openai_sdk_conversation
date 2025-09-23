@@ -1,3 +1,4 @@
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py  
 """Costanti per l'integrazione Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
@@ -53,6 +54,21 @@ DEFAULT_LOG_LEVEL: Final[str] = LOG_LEVEL_ERROR
 DEFAULT_LOG_MAX_PAYLOAD_CHARS: Final[int] = 12000  
 DEFAULT_LOG_MAX_SSE_LINES: Final[int] = 10  
   
+# Early wait configurabile (nuove chiavi)  
+CONF_EARLY_WAIT_ENABLE: Final[str] = "early_wait_enable"  
+CONF_EARLY_WAIT_SECONDS: Final[str] = "early_wait_seconds"  
+  
+# Vocabolario / sinonimi  
+CONF_VOCABULARY_ENABLE: Final[str] = "vocabulary_enable"  
+CONF_SYNONYMS_FILE: Final[str] = "synonyms_file"  
+  
+# Utterances log (nuove chiavi corrette)  
+CONF_LOG_UTTERANCES: Final[str] = "log_utterances"  
+CONF_UTTERANCES_LOG_PATH: Final[str] = "utterances_log_path"  
+  
+# Retrocompatibilità: chiavi/alias legacy  
+CONF_EARLY_TIMEOUT_SECONDS: Final[str] = "early_timeout_seconds"  # alias legacy per early wait seconds  
+  
 # Chiavi errori per UI/config flow  
 ERROR_CANNOT_CONNECT: Final[str] = "cannot_connect"  
 ERROR_INVALID_AUTH: Final[str] = "invalid_auth"  
@@ -93,6 +109,14 @@ RECOMMENDED_WEB_SEARCH: Final[bool] = False
 RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE: Final[int] = 2000  
 RECOMMENDED_WEB_SEARCH_USER_LOCATION: Final[bool] = False  
   
+# Raccomandazioni Early Wait e Vocabolario  
+RECOMMENDED_EARLY_WAIT_ENABLE: Final[bool] = True  
+RECOMMENDED_EARLY_WAIT_SECONDS: Final[int] = 5  
+RECOMMENDED_VOCABULARY_ENABLE: Final[bool] = True  
+  
+# Retrocompatibilità: alias legacy per recommended early timeout  
+RECOMMENDED_EARLY_TIMEOUT_SECONDS: Final[int] = RECOMMENDED_EARLY_WAIT_SECONDS  
+  
 __all__ = [  
     # Domain / platforms  
     "DOMAIN",  
@@ -130,6 +154,16 @@ __all__ = [
     "DEFAULT_LOG_LEVEL",  
     "DEFAULT_LOG_MAX_PAYLOAD_CHARS",  
     "DEFAULT_LOG_MAX_SSE_LINES",  
+    # Early wait + Vocabolario + Utterances  
+    "CONF_EARLY_WAIT_ENABLE",  
+    "CONF_EARLY_WAIT_SECONDS",  
+    "CONF_VOCABULARY_ENABLE",  
+    "CONF_SYNONYMS_FILE",  
+    "CONF_LOG_UTTERANCES",  
+    "CONF_UTTERANCES_LOG_PATH",  
+    # Retrocompatibilità (alias)  
+    "CONF_EARLY_TIMEOUT_SECONDS",  
+    "RECOMMENDED_EARLY_TIMEOUT_SECONDS",  
     # Error keys  
     "ERROR_CANNOT_CONNECT",  
     "ERROR_INVALID_AUTH",  
@@ -154,4 +188,7 @@ __all__ = [
     "RECOMMENDED_WEB_SEARCH",  
     "RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE",  
     "RECOMMENDED_WEB_SEARCH_USER_LOCATION",  
+    "RECOMMENDED_EARLY_WAIT_ENABLE",  
+    "RECOMMENDED_EARLY_WAIT_SECONDS",  
+    "RECOMMENDED_VOCABULARY_ENABLE",  
 ]  

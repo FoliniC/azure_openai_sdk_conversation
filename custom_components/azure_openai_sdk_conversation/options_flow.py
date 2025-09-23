@@ -1,3 +1,4 @@
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/options_flow.py  
 """Options flow for Azure OpenAI SDK Conversation."""  
 from __future__ import annotations  
   
@@ -52,6 +53,16 @@ from .const import (
     LOG_LEVEL_ERROR,  
     LOG_LEVEL_INFO,  
     LOG_LEVEL_TRACE,  
+    # early wait + vocabolario + utterances  
+    CONF_EARLY_WAIT_ENABLE,  
+    CONF_EARLY_WAIT_SECONDS,  
+    CONF_VOCABULARY_ENABLE,  
+    CONF_SYNONYMS_FILE,  
+    CONF_LOG_UTTERANCES,  
+    CONF_UTTERANCES_LOG_PATH,  
+    RECOMMENDED_EARLY_WAIT_ENABLE,  
+    RECOMMENDED_EARLY_WAIT_SECONDS,  
+    RECOMMENDED_VOCABULARY_ENABLE,  
 )  
 from .utils import APIVersionManager  
   
@@ -275,6 +286,60 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         mode="box",  
                     )  
                 ),  
+            }  
+        )  
+  
+        # Early wait (abilitazione + secondi)  
+        schema = schema.extend(  
+            {  
+                vol.Optional(  
+                    CONF_EARLY_WAIT_ENABLE,  
+                    default=self.config_entry.options.get(CONF_EARLY_WAIT_ENABLE, RECOMMENDED_EARLY_WAIT_ENABLE),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_EARLY_WAIT_SECONDS,  
+                    default=self.config_entry.options.get(CONF_EARLY_WAIT_SECONDS, RECOMMENDED_EARLY_WAIT_SECONDS),  
+                ): NumberSelector(  
+                    NumberSelectorConfig(  
+                        min=1,  
+                        max=120,  
+                        step=1,  
+                        mode="box",  
+                    )  
+                ),  
+            }  
+        )  
+  
+        # Vocabolario (abilitazione + file sinonimi)  
+        schema = schema.extend(  
+            {  
+                vol.Optional(  
+                    CONF_VOCABULARY_ENABLE,  
+                    default=self.config_entry.options.get(CONF_VOCABULARY_ENABLE, RECOMMENDED_VOCABULARY_ENABLE),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_SYNONYMS_FILE,  
+                    default=self.config_entry.options.get(  
+                        CONF_SYNONYMS_FILE,  
+                        "custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json",  
+                    ),  
+                ): str,  
+            }  
+        )  
+  
+        # Utterances log (abilitazione + percorso file)  
+        schema = schema.extend(  
+            {  
+                vol.Optional(  
+                    CONF_LOG_UTTERANCES,  
+                    default=self.config_entry.options.get(CONF_LOG_UTTERANCES, True),  
+                ): BooleanSelector(),  
+                vol.Optional(  
+                    CONF_UTTERANCES_LOG_PATH,  
+                    default=self.config_entry.options.get(  
+                        CONF_UTTERANCES_LOG_PATH, ".storage/azure_openai_conversation_utterances.log"  
+                    ),  
+                ): str,  
             }  
         )  
   

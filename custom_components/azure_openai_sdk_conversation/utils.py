@@ -13,6 +13,7 @@ from .const import (
     RECOMMENDED_TOP_P,  
     RECOMMENDED_API_TIMEOUT,  
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,  
+    RECOMMENDED_EARLY_TIMEOUT_SECONDS,  
 )  
   
   
@@ -183,6 +184,8 @@ class AzureOpenAIValidator:
             "reasoning_effort": {"default": RECOMMENDED_REASONING_EFFORT},  
             "api_timeout": {"default": RECOMMENDED_API_TIMEOUT, "min": 5, "max": 120, "step": 1},  
             "exposed_entities_limit": {"default": RECOMMENDED_EXPOSED_ENTITIES_LIMIT, "min": 50, "max": 2000, "step": 10},  
+            # Nuovo: early wait timeout per primo chunk di risposta  
+            "early_timeout_seconds": {"default": RECOMMENDED_EARLY_TIMEOUT_SECONDS, "min": 1, "max": 60, "step": 1},  
         }  
         # Nota: puoi espandere con altri campi specifici in futuro.  
         return caps  

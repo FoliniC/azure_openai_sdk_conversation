@@ -1,4 +1,6 @@
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/config_flow.py  
 """Config flow for Azure OpenAI SDK Conversation – versione 2025.9+."""  
+  
 from __future__ import annotations  
   
 import logging  
@@ -65,6 +67,16 @@ from .const import (
     LOG_LEVEL_ERROR,  
     LOG_LEVEL_INFO,  
     LOG_LEVEL_TRACE,  
+    # early wait + vocabolario + utterances  
+    CONF_EARLY_WAIT_ENABLE,  
+    CONF_EARLY_WAIT_SECONDS,  
+    CONF_VOCABULARY_ENABLE,  
+    CONF_SYNONYMS_FILE,  
+    CONF_LOG_UTTERANCES,  
+    CONF_UTTERANCES_LOG_PATH,  
+    RECOMMENDED_EARLY_WAIT_ENABLE,  
+    RECOMMENDED_EARLY_WAIT_SECONDS,  
+    RECOMMENDED_VOCABULARY_ENABLE,  
 )  
 from .utils import APIVersionManager, AzureOpenAILogger, AzureOpenAIValidator  
   
@@ -87,7 +99,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Azure OpenAI SDK Conversation."""  
   
     VERSION = 2  
-    MINOR_VERSION = 1  # Aggiunto per supporto versioning migliorato  
+    MINOR_VERSION = 3  # Early wait + vocabolario + utterances path  
   
     def __init__(self) -> None:  
         """Initialize the config flow."""  
@@ -182,6 +194,20 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             NumberSelectorConfig(min=1, max=200, step=1, mode="box")  
         )  
   
+        # Early wait: abilita e secondi  
+        cap_schema[vol.Optional(CONF_EARLY_WAIT_ENABLE, default=RECOMMENDED_EARLY_WAIT_ENABLE)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_EARLY_WAIT_SECONDS, default=RECOMMENDED_EARLY_WAIT_SECONDS)] = NumberSelector(  
+            NumberSelectorConfig(min=1, max=120, step=1, mode="box")  
+        )  
+  
+        # Vocabolario: abilita e file sinonimi  
+        cap_schema[vol.Optional(CONF_VOCABULARY_ENABLE, default=RECOMMENDED_VOCABULARY_ENABLE)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_SYNONYMS_FILE, default="custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json")] = str  
+  
+        # Log utterances: abilita e percorso file  
+        cap_schema[vol.Optional(CONF_LOG_UTTERANCES, default=True)] = BooleanSelector()  
+        cap_schema[vol.Optional(CONF_UTTERANCES_LOG_PATH, default=".storage/azure_openai_conversation_utterances.log")] = str  
+  
         if not cap_schema:  
             # nothing extra to ask  
             return self._create_entry(options={})  
@@ -208,7 +234,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                     else:  
                         cleaned[fld] = val  
                 else:  
-                    # Opzioni extra (log, ecc.) copiate così come sono  
+                    # Opzioni extra (log, early wait, vocabolario, utterances, ecc.)  
                     cleaned[fld] = val  
   
             if not errors:  
@@ -263,6 +289,15 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_LOG_SYSTEM_MESSAGE: False,  
             CONF_LOG_MAX_PAYLOAD_CHARS: DEFAULT_LOG_MAX_PAYLOAD_CHARS,  
             CONF_LOG_MAX_SSE_LINES: DEFAULT_LOG_MAX_SSE_LINES,  
+            # early wait defaults  
+            CONF_EARLY_WAIT_ENABLE: RECOMMENDED_EARLY_WAIT_ENABLE,  
+            CONF_EARLY_WAIT_SECONDS: RECOMMENDED_EARLY_WAIT_SECONDS,  
+            # vocabolario defaults  
+            CONF_VOCABULARY_ENABLE: RECOMMENDED_VOCABULARY_ENABLE,  
+            CONF_SYNONYMS_FILE: "custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json",  
+            # utterances log defaults  
+            CONF_LOG_UTTERANCES: True,  
+            CONF_UTTERANCES_LOG_PATH: ".storage/azure_openai_conversation_utterances.log",  
         }  
         base_opts.update(options)  
   

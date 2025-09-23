@@ -1,0 +1,42 @@
+{  
+  "token_synonyms": {  
+    "off": "spegni",  
+    "disattiva": "spegni",  
+    "disattivare": "spegni",  
+    "spegnere": "spegni",  
+    "spengi": "spegni",  
+    "spegni": "spegni",  
+  
+    "on": "accendi",  
+    "attiva": "accendi",  
+    "attivare": "accendi",  
+    "accendere": "accendi",  
+    "accendi": "accendi",  
+  
+    "luci": "luce",  
+    "lampada": "luce",  
+    "lampadario": "luce",  
+    "faretti": "luce",  
+    "spot": "luce",  
+  
+    "luce tavolo": "tavolo",  
+    "luci tavolo": "tavolo",  
+    "tavolo cucina": "tavolo",  
+    "luce tavolo cucina": "tavolo",  
+    "luci tavolo cucina": "tavolo",  
+  
+    "salotto": "soggiorno",  
+    "sala": "soggiorno",  
+    "bagni": "bagno"  
+  },  
+  
+  "regex_rules": [  
+    { "pattern": "\\b(spegni|accendi)\\s+(il|lo|la|i|gli|le|l')\\s+", "replace": "\\1 " },  
+  
+    { "pattern": "\\b(luce|luci)\\s+(del|della|dello|dei|degli|delle)\\s+(tavolo)\\b", "replace": "\\3" },  
+    { "pattern": "\\b(luce|luci)\\s+tavolo\\b", "replace": "tavolo" },  
+    { "pattern": "\\btavolo\\s+cucina\\b", "replace": "tavolo" },  
+  
+    { "pattern": "\\s{2,}", "replace": " " }  
+  ]  
+}  
