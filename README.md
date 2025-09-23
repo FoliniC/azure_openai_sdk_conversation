@@ -1,5 +1,6 @@
 Note: this project it's experimental 'till this note remains. <br/>
-This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, it's based on the original OpenAI Conversation integration for Home Assistant.
+This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, it's based on the original OpenAI Conversation integration for Home Assistant.<br/>
+Install from HACS adding this github repo (https://github.com/FoliniC/azure_openai_sdk_conversation).
 
 What It Does
 This is equivalent to the built-in OpenAI Conversation integration. The difference is that it uses the OpenAI algorithms available through Azure. You can use this conversation integration with Assistants in Home Assistant to control you house. They have all the capabilities the built-in OpenAI Conversation integration has.
