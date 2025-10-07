@@ -1,4 +1,3 @@
-Note: this project it's experimental 'till this note remains. <br/>
 This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, it's based on the original OpenAI Conversation integration for Home Assistant.<br/>
 Install from HACS adding this github repo (https://github.com/FoliniC/azure_openai_sdk_conversation).
 
@@ -6,7 +5,7 @@ What It Does
 This is equivalent to the built-in OpenAI Conversation integration. The difference is that it uses the OpenAI algorithms available through Azure. You can use this conversation integration with Assistants in Home Assistant to control you house. They have all the capabilities the built-in OpenAI Conversation integration has.
 Configuration can be changed in options after been created.<br/>
 Additional Features<br/>
-<ul><li>Ability to retrieve state history of entities<br/></li>
+<ul><li>Ability to retrieve state history of exposed entities<br/></li>
 <li>Ability to change logs verbosity from options. Be sure to enable debug logs on component setting following line in configuration.yaml<br/>
 ```custom_components.azure_openai_sdk_conversation: debug```<br/>
 Note: also those lines are usefull for troubleshooting:
@@ -14,6 +13,9 @@ Note: also those lines are usefull for troubleshooting:
     homeassistant.components.conversation: debug```
 </li>
 <li>Ability to pass custom informations with HA template.<br/>
+<li>Ability to substitute prompt of similar prompts (with vocabulary).<br/>
+<li>Ability to stop prompt execution (ready wait).<br/>
+<li>Ability to store prompt history.<br/>
 <br/>
 Sample system message:<br/>
   
