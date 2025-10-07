@@ -7,7 +7,7 @@
     "intent"  
   ],  
   "config_flow": true,  
-  "version": "0.3.3",  
+  "version": "0.3.2",  
   "documentation": "https://github.com/FoliniC/azure_openai_sdk_conversation",  
   "issue_tracker": "https://github.com/FoliniC/azure_openai_sdk_conversation/issues",
   "requirements": [  

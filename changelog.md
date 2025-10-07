@@ -8,6 +8,22 @@ Compatible with Home Assistant ≥ 2025.3
 - if no response arrives in 5 seconds, ask user seconds to wait or stop
 - add vocabulary to group similar prompts
 - configuration in config flow and option flow of previous points
+- Added Azure OpenAI conversation integration:
+  - New AzureOpenAIConversationAgent with advanced Responses API and Chat Completions handling.
+  - SSE streaming support for Responses and Chat with multi-format parsing and fallbacks.
+  - Non-streaming Responses fallback implemented.
+  - Dynamic token parameter selection (max_tokens / max_completion_tokens / max_output_tokens) based on api-version and model.
+  - Enhanced logging options for request/response payloads, system message, and SSE debug sampling.
+  - System message templating using Home Assistant Jinja templates with a regex fallback for azure.* variables.
+  - Collection of Home Assistant exposed entities (name, state, area) to provide contextual information to the model.
+  - Optional Web Search (Bing) integration to include search results as model context.
+  - Backwards-compatible configuration mapping (api_base, chat_model, enable_web_search, legacy keys).
+  - New SSE debug options and intelligent API-version/parameter retry logic.
+
+- Minor fixes and hardening:
+  - Robust JSON parsing for streaming and non-streaming responses.
+  - Timeouts and type coercions for configuration parameters.
+  - Automatic fallback from Responses to Chat Completions when no text is produced.
 
 ## 0.3.1 – September 2025  
 Compatible with Home Assistant ≥ 2025.3  

@@ -1,6 +1,6 @@
 # File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/conversation.py
 # -*- coding: utf-8 -*-
-"""Conversation provider for Azure OpenAI with optional web-search context, synonym normalization,
+"""Conversation provider for Azure OpenAI with optional web-search context, synonym normalization,  
 local intent execution (turn_on/turn_off) and safe speech fallback."""
 
 from __future__ import annotations
