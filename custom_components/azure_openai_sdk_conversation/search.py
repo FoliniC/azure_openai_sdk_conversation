@@ -36,7 +36,7 @@ class WebSearchClient:
         if not query:  
             return ""  
   
-        # Placeholder: qui potrai implementare la chiamata reale all'API Bing  
+        # Placeholder: you can implement the real call to the Bing API here  
         _LOGGER.debug("WebSearchClient: searching for: %s", query)  
         results_md = f"**Web Search Results for: {query}**\n\n"  
         results_md += "*(Web search functionality requires proper API configuration)*\n"  
@@ -45,7 +45,7 @@ class WebSearchClient:
     async def close(self) -> None:  
         """Clean up resources."""  
         if self._http_client:  
-            # cleanup se necessario  
+            # cleanup if necessary  
             self._http_client = None  
   
     def format_results(self, results: List[dict[str, Any]]) -> str:  

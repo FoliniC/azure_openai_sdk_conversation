@@ -135,7 +135,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         debug_sse_lines,  
     )  
   
-    # Reload automatico al cambio opzioni  
+    # Automatic reload on options change  
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))  
   
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)  
