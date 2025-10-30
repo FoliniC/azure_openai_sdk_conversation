@@ -1,24 +1,62 @@
-This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, it's based on the original OpenAI Conversation integration for Home Assistant.<br/>
-Install from HACS adding this github repo (https://github.com/FoliniC/azure_openai_sdk_conversation).
+# Azure OpenAI SDK Conversation
 
-What It Does
-This is equivalent to the built-in OpenAI Conversation integration. The difference is that it uses the OpenAI algorithms available through Azure. You can use this conversation integration with Assistants in Home Assistant to control you house. They have all the capabilities the built-in OpenAI Conversation integration has.
-Configuration can be changed in options after been created.<br/>
-Additional Features<br/>
-<ul><li>Ability to retrieve state history of exposed entities<br/></li>
-<li>Ability to change logs verbosity from options. Be sure to enable debug logs on component setting following line in configuration.yaml<br/>
-```custom_components.azure_openai_sdk_conversation: debug```<br/>
-Note: also those lines are usefull for troubleshooting:
-```    homeassistant.components.assist_pipeline: debug
-    homeassistant.components.conversation: debug```
-</li>
-<li>Ability to pass custom informations with HA template.<br/>
-<li>Ability to substitute prompt of similar prompts (with vocabulary).<br/>
-<li>Ability to stop prompt execution (ready wait).<br/>
-<li>Ability to store prompt history.<br/>
-<br/>
-Sample system message:<br/>
-  
+[![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
+
+This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, based on the original OpenAI Conversation integration.
+
+## Features
+
+*   **Azure OpenAI Integration**: Uses OpenAI models available through Azure.
+*   **Stateful Conversations**: A stateful MCP (Master Control Program) server sits between Home Assistant and Azure to enable more complex interactions.
+*   **State History**: Ability to retrieve state history of exposed entities.
+*   **Configurable Logging**: Change log verbosity from the options UI.
+*   **Custom Template Information**: Pass custom information using Home Assistant templates.
+*   **Synonym Normalization**: Substitute similar prompts using a vocabulary.
+*   **Prompt Execution Control**: Ability to stop long-running prompts.
+*   **History**: Stores prompt history.
+*   **Web Search**: Optional Bing search integration for real-time information.
+*   **Flexible Configuration**: Configure and modify endpoint, model, and max tokens in the options UI.
+
+## Architecture: The MCP Server
+
+Starting with version 0.4, this integration uses an intermediary "MCP (Master Control Program) Server" to manage the conversation state. This allows for more complex and stateful interactions, as the MCP server sits between Home Assistant and the stateless Azure OpenAI service.
+
+```
++-----------------+      +--------------+      +-----------------+
+¦  Home Assistant ¦?----?¦  MCP Server  ¦?----?¦  Azure OpenAI   ¦
+¦   (conversation)¦      ¦  (stateful)  ¦      ¦   (stateless)   ¦
++-----------------+      +--------------+      +-----------------+
+                               ¦
+                               ?
+                         +----------+
+                         ¦  State   ¦
+                         ¦  Cache   ¦
+                         +----------+
+```
+
+## Installation
+
+Install from HACS by adding this GitHub repository (`https://github.com/FoliniC/azure_openai_sdk_conversation`) as a custom repository.
+
+## Configuration
+
+Configuration can be changed in the integration's options page after it has been added.
+
+<img width="431" height="452" alt="image" src="https://github.com/user-attachments/assets/656a3d06-9e0d-4a8a-b78e-c56016fe00c0" />
+
+For troubleshooting, it is useful to add the following to your `configuration.yaml`:
+```yaml
+logger:
+  default: info
+  logs:
+    custom_components.azure_openai_sdk_conversation: debug
+    homeassistant.components.assist_pipeline: debug
+    homeassistant.components.conversation: debug
+```
+
+### Example System Prompt
+
+Here is an example of a system message to instruct the assistant:
 ```
 You are an assistant controlling a Home Assistant instance. 
 Current time: {{ now() }}
@@ -67,19 +105,9 @@ For unrelated topics, respond based on your general knowledge.
 - Use short forms of entity names for brevity.
 - Speak in italian.
 ```
-</li>
-<li>Ability to configure and modify endpoint, model, max tokens on options.<br/>
-<img width="431" height="452" alt="image" src="https://github.com/user-attachments/assets/656a3d06-9e0d-4a8a-b78e-c56016fe00c0" />
 
-</li>
-</ul>
-
-<br/><br/>
-Tested models:<ul>
-<li>gpt-5</li>
-<li>grok-3</li>
-
-<li>o1</li>
-
-<li>gpt-4o-mini</li>
-</ul>
+## Tested Models
+- gpt-5
+- grok-3
+- o1
+- gpt-4o-mini
