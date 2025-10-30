@@ -111,3 +111,7 @@ For unrelated topics, respond based on your general knowledge.
 - grok-3
 - o1
 - gpt-4o-mini
+
+## Support
+
+If you find this integration useful, you can [buy me a glass of white wine](https://buymeacoffee.com/carlofolinf).
