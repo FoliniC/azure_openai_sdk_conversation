@@ -22,16 +22,16 @@ This custom integration adds a conversation agent powered by Azure OpenAI in Hom
 Starting with version 0.4, this integration uses an intermediary "MCP (Master Control Program) Server" to manage the conversation state. This allows for more complex and stateful interactions, as the MCP server sits between Home Assistant and the stateless Azure OpenAI service.
 
 ```
-+-----------------+      +--------------+      +-----------------+
-�  Home Assistant �?----?�  MCP Server  �?----?�  Azure OpenAI   �
-�   (conversation)�      �  (stateful)  �      �   (stateless)   �
-+-----------------+      +--------------+      +-----------------+
-                               �
-                               ?
-                         +----------+
-                         �  State   �
-                         �  Cache   �
-                         +----------+
+┌─────────────────┐      ┌──────────────┐      ┌─────────────────┐
+│  Home Assistant │◄────►│  MCP Server  │◄────►│  Azure OpenAI   │
+│   (conversation)│      │  (stateful)  │      │   (stateless)   │
+└─────────────────┘      └──────────────┘      └─────────────────┘
+                               │
+                               ▼
+                         ┌──────────┐
+                         │  State   │
+                         │  Cache   │
+                         └──────────┘
 ```
 
 ## Installation
@@ -42,7 +42,7 @@ Install from HACS by adding this GitHub repository (`https://github.com/FoliniC/
 
 Configuration can be changed in the integration's options page after it has been added.
 
-<img width="431" height="452" alt="image" src="https://github.com/user-attachments/assets/656a3d06-9e0d-4a8a-b78e-c56016fe00c0" />
+![Configuration UI](docs/images/SetupCard.png)
 
 For troubleshooting, it is useful to add the following to your `configuration.yaml`:
 ```yaml
