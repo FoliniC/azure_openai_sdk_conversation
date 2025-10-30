@@ -1,5 +1,17 @@
 # CHANGELOG – Azure OpenAI SDK Conversation  
-  
+## 0.4 - October 2025
+### Higlights
+- use MCP server
+┌─────────────────┐      ┌──────────────┐      ┌─────────────────┐
+│  Home Assistant │◄────►│  MCP Server  │◄────►│  Azure OpenAI   │
+│   (conversation)│      │  (stateful)  │      │   (stateless)   │
+└─────────────────┘      └──────────────┘      └─────────────────┘
+                               │
+                               ▼
+                         ┌──────────┐
+                         │  State   │
+                         │  Cache   │
+                         └──────────┘  
 ## 0.3.2 – September 2025  
 Compatible with Home Assistant ≥ 2025.3  
   
