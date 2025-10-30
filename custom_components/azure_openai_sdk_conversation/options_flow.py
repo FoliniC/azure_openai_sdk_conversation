@@ -1,5 +1,6 @@
 # File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/options_flow.py
 """Options flow for Azure OpenAI SDK Conversation."""
+
 from __future__ import annotations
 
 import logging
@@ -76,7 +77,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
         """Initialize options flow."""
         self.config_entry = config_entry
 
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Manage the options."""
         # If the user has submitted the form, we recalculate token_param consistent with model+version.
         if user_input is not None:
@@ -97,11 +100,19 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 except Exception:  # noqa: BLE001
                     return (1900, 1, 1)
 
-            if model.startswith("gpt-5") or model.startswith("gpt-4.1") or model.startswith("gpt-4.2"):
+            if (
+                model.startswith("gpt-5")
+                or model.startswith("gpt-4.1")
+                or model.startswith("gpt-4.2")
+            ):
                 token_param = "max_completion_tokens"
             else:
                 y, m, d = _ver_date_tuple(chosen_version)
-                token_param = "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"
+                token_param = (
+                    "max_completion_tokens"
+                    if (y, m, d) >= (2025, 3, 1)
+                    else "max_tokens"
+                )
 
             # Also save token_param in the options to guide the Chat provider to avoid the first wrong attempt.
             user_input = {**user_input, "token_param": token_param}
@@ -115,11 +126,15 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_PROMPT,
-                    default=self.config_entry.options.get(CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT),
+                    default=self.config_entry.options.get(
+                        CONF_PROMPT, llm.DEFAULT_INSTRUCTIONS_PROMPT
+                    ),
                 ): TemplateSelector(),
                 vol.Optional(
                     CONF_TEMPERATURE,
-                    default=self.config_entry.options.get(CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE),
+                    default=self.config_entry.options.get(
+                        CONF_TEMPERATURE, RECOMMENDED_TEMPERATURE
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=0.0,
@@ -130,7 +145,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_TOP_P,
-                    default=self.config_entry.options.get(CONF_TOP_P, RECOMMENDED_TOP_P),
+                    default=self.config_entry.options.get(
+                        CONF_TOP_P, RECOMMENDED_TOP_P
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=0.0,
@@ -141,7 +158,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_MAX_TOKENS,
-                    default=self.config_entry.options.get(CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS),
+                    default=self.config_entry.options.get(
+                        CONF_MAX_TOKENS, RECOMMENDED_MAX_TOKENS
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=1,
@@ -173,7 +192,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 {
                     vol.Optional(
                         CONF_REASONING_EFFORT,
-                        default=self.config_entry.options.get(CONF_REASONING_EFFORT, RECOMMENDED_REASONING_EFFORT),
+                        default=self.config_entry.options.get(
+                            CONF_REASONING_EFFORT, RECOMMENDED_REASONING_EFFORT
+                        ),
                     ): SelectSelector(
                         SelectSelectorConfig(
                             options=["low", "medium", "high"],
@@ -185,7 +206,8 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
 
         # Advanced options for API version
         current_version = self.config_entry.options.get(
-            CONF_API_VERSION, self.config_entry.data.get(CONF_API_VERSION, "2025-03-01-preview")
+            CONF_API_VERSION,
+            self.config_entry.data.get(CONF_API_VERSION, "2025-03-01-preview"),
         )
         known_versions = APIVersionManager.known_versions()
         if current_version not in known_versions:
@@ -211,7 +233,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             {
                 vol.Optional(
                     CONF_WEB_SEARCH,
-                    default=self.config_entry.options.get(CONF_WEB_SEARCH, RECOMMENDED_WEB_SEARCH),
+                    default=self.config_entry.options.get(
+                        CONF_WEB_SEARCH, RECOMMENDED_WEB_SEARCH
+                    ),
                 ): BooleanSelector(),
             }
         )
@@ -221,7 +245,8 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                     vol.Optional(
                         CONF_WEB_SEARCH_CONTEXT_SIZE,
                         default=self.config_entry.options.get(
-                            CONF_WEB_SEARCH_CONTEXT_SIZE, RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE
+                            CONF_WEB_SEARCH_CONTEXT_SIZE,
+                            RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,
                         ),
                     ): NumberSelector(
                         NumberSelectorConfig(
@@ -234,7 +259,8 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                     vol.Optional(
                         CONF_WEB_SEARCH_USER_LOCATION,
                         default=self.config_entry.options.get(
-                            CONF_WEB_SEARCH_USER_LOCATION, RECOMMENDED_WEB_SEARCH_USER_LOCATION
+                            CONF_WEB_SEARCH_USER_LOCATION,
+                            RECOMMENDED_WEB_SEARCH_USER_LOCATION,
                         ),
                     ): BooleanSelector(),
                 }
@@ -245,28 +271,43 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             {
                 vol.Optional(
                     CONF_LOG_LEVEL,
-                    default=self.config_entry.options.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL
+                    ),
                 ): SelectSelector(
                     SelectSelectorConfig(
-                        options=[LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_TRACE],
+                        options=[
+                            LOG_LEVEL_NONE,
+                            LOG_LEVEL_ERROR,
+                            LOG_LEVEL_INFO,
+                            LOG_LEVEL_TRACE,
+                        ],
                         mode=SelectSelectorMode.DROPDOWN,
                     )
                 ),
                 vol.Optional(
                     CONF_LOG_PAYLOAD_REQUEST,
-                    default=self.config_entry.options.get(CONF_LOG_PAYLOAD_REQUEST, False),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_PAYLOAD_REQUEST, False
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_LOG_PAYLOAD_RESPONSE,
-                    default=self.config_entry.options.get(CONF_LOG_PAYLOAD_RESPONSE, False),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_PAYLOAD_RESPONSE, False
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_LOG_SYSTEM_MESSAGE,
-                    default=self.config_entry.options.get(CONF_LOG_SYSTEM_MESSAGE, False),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_SYSTEM_MESSAGE, False
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_LOG_MAX_PAYLOAD_CHARS,
-                    default=self.config_entry.options.get(CONF_LOG_MAX_PAYLOAD_CHARS, DEFAULT_LOG_MAX_PAYLOAD_CHARS),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_MAX_PAYLOAD_CHARS, DEFAULT_LOG_MAX_PAYLOAD_CHARS
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=100,
@@ -277,7 +318,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ),
                 vol.Optional(
                     CONF_LOG_MAX_SSE_LINES,
-                    default=self.config_entry.options.get(CONF_LOG_MAX_SSE_LINES, DEFAULT_LOG_MAX_SSE_LINES),
+                    default=self.config_entry.options.get(
+                        CONF_LOG_MAX_SSE_LINES, DEFAULT_LOG_MAX_SSE_LINES
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=1,
@@ -294,11 +337,15 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             {
                 vol.Optional(
                     CONF_EARLY_WAIT_ENABLE,
-                    default=self.config_entry.options.get(CONF_EARLY_WAIT_ENABLE, RECOMMENDED_EARLY_WAIT_ENABLE),
+                    default=self.config_entry.options.get(
+                        CONF_EARLY_WAIT_ENABLE, RECOMMENDED_EARLY_WAIT_ENABLE
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_EARLY_WAIT_SECONDS,
-                    default=self.config_entry.options.get(CONF_EARLY_WAIT_SECONDS, RECOMMENDED_EARLY_WAIT_SECONDS),
+                    default=self.config_entry.options.get(
+                        CONF_EARLY_WAIT_SECONDS, RECOMMENDED_EARLY_WAIT_SECONDS
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=1,
@@ -315,7 +362,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             {
                 vol.Optional(
                     CONF_VOCABULARY_ENABLE,
-                    default=self.config_entry.options.get(CONF_VOCABULARY_ENABLE, RECOMMENDED_VOCABULARY_ENABLE),
+                    default=self.config_entry.options.get(
+                        CONF_VOCABULARY_ENABLE, RECOMMENDED_VOCABULARY_ENABLE
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_SYNONYMS_FILE,
@@ -337,7 +386,8 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 vol.Optional(
                     CONF_UTTERANCES_LOG_PATH,
                     default=self.config_entry.options.get(
-                        CONF_UTTERANCES_LOG_PATH, ".storage/azure_openai_conversation_utterances.log"
+                        CONF_UTTERANCES_LOG_PATH,
+                        ".storage/azure_openai_conversation_utterances.log",
                     ),
                 ): str,
             }

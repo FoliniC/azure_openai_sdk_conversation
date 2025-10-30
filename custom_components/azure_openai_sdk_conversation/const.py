@@ -1,5 +1,6 @@
 # File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py
 """Constants for the Azure OpenAI SDK Conversation integration."""
+
 from __future__ import annotations
 
 from typing import Final, List
@@ -12,14 +13,18 @@ DOMAIN: Final[str] = "azure_openai_sdk_conversation"
 PLATFORMS: Final[List[Platform]] = [Platform.CONVERSATION]
 
 # Configuration keys (schema/entry) - CONF_* convention
-CONF_API_BASE: Final[str] = "api_base"            # E.g., https://<resource>.openai.azure.com
+CONF_API_BASE: Final[str] = "api_base"  # E.g., https://<resource>.openai.azure.com
 CONF_API_KEY: Final[str] = "api_key"
-CONF_CHAT_MODEL: Final[str] = "chat_model"        # Deployment name (Azure) or model
-CONF_DEPLOYMENT: Final[str] = CONF_CHAT_MODEL     # Alias used in some flow versions
-CONF_API_VERSION: Final[str] = "api_version"      # E.g., 2025-01-01-preview / 2025-03-01-preview
-CONF_TOKEN_PARAM: Final[str] = "token_param"      # max_tokens / max_completion_tokens / max_output_tokens
+CONF_CHAT_MODEL: Final[str] = "chat_model"  # Deployment name (Azure) or model
+CONF_DEPLOYMENT: Final[str] = CONF_CHAT_MODEL  # Alias used in some flow versions
+CONF_API_VERSION: Final[str] = (
+    "api_version"  # E.g., 2025-01-01-preview / 2025-03-01-preview
+)
+CONF_TOKEN_PARAM: Final[str] = (
+    "token_param"  # max_tokens / max_completion_tokens / max_output_tokens
+)
 CONF_SYSTEM_PROMPT: Final[str] = "system_prompt"
-CONF_PROMPT: Final[str] = "prompt"                # Alias required by config_flow (backcompat)
+CONF_PROMPT: Final[str] = "prompt"  # Alias required by config_flow (backcompat)
 
 # Model parameters as CONF_* (used in config_flow/options_flow)
 CONF_TEMPERATURE: Final[str] = "temperature"
@@ -67,7 +72,9 @@ CONF_LOG_UTTERANCES: Final[str] = "log_utterances"
 CONF_UTTERANCES_LOG_PATH: Final[str] = "utterances_log_path"
 
 # Backward compatibility: legacy keys/aliases
-CONF_EARLY_TIMEOUT_SECONDS: Final[str] = "early_timeout_seconds"  # legacy alias for early wait seconds
+CONF_EARLY_TIMEOUT_SECONDS: Final[str] = (
+    "early_timeout_seconds"  # legacy alias for early wait seconds
+)
 
 # Error keys for UI/config flow
 ERROR_CANNOT_CONNECT: Final[str] = "cannot_connect"
@@ -96,12 +103,12 @@ DEFAULT_SYSTEM_PROMPT: Final[str] = (
 )
 
 # Recommended values for model parameters and options
-RECOMMENDED_CHAT_MODEL: Final[str] = "gpt-4o-mini"          # Recommended default deployment
+RECOMMENDED_CHAT_MODEL: Final[str] = "gpt-4o-mini"  # Recommended default deployment
 RECOMMENDED_TEMPERATURE: Final[float] = 0.7
 RECOMMENDED_TOP_P: Final[float] = 1.0
 RECOMMENDED_MAX_TOKENS: Final[int] = 512
 RECOMMENDED_API_TIMEOUT: Final[int] = 30
-RECOMMENDED_REASONING_EFFORT: Final[str] = "medium"         # for 'o*' models (o1, o3, etc.)
+RECOMMENDED_REASONING_EFFORT: Final[str] = "medium"  # for 'o*' models (o1, o3, etc.)
 RECOMMENDED_EXPOSED_ENTITIES_LIMIT: Final[int] = 500
 
 # Recommendations for web search (if enabled by the integration)

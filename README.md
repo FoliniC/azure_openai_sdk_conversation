@@ -1,5 +1,10 @@
 # Azure OpenAI SDK Conversation
 
+[![Validate HACS](https://github.com/FoliniC/azure_openai_sdk_conversation/actions/workflows/validate_hacs.yml/badge.svg)](https://github.com/FoliniC/azure_openai_sdk_conversation/actions/workflows/validate_hacs.yml)
+[![Linting](https://github.com/FoliniC/azure_openai_sdk_conversation/actions/workflows/lint.yml/badge.svg)](https://github.com/FoliniC/azure_openai_sdk_conversation/actions/workflows/lint.yml)
+[![GitHub All Releases](https://img.shields.io/github/downloads/FoliniC/azure_openai_sdk_conversation/total)](https://github.com/FoliniC/azure_openai_sdk_conversation/releases)
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/FoliniC?style=social)](https://github.com/sponsors/FoliniC)
+[![Buy me a glass of white wine](https://img.shields.io/badge/-%20buy%20me%20a%20glass%20of%20white%20wine-yellow?logo=buy-me-a-coffee)](https://buymeacoffee.com/carlofolinf)
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz/)
 
 This custom integration adds a conversation agent powered by Azure OpenAI in Home Assistant, based on the original OpenAI Conversation integration.

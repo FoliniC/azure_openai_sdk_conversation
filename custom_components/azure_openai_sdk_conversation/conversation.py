@@ -51,7 +51,6 @@ from .const import (
     DEFAULT_LOG_MAX_SSE_LINES,
     LOG_LEVEL_ERROR,
     LOG_LEVEL_INFO,
-    LOG_LEVEL_NONE,
     LOG_LEVEL_TRACE,
     RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,
     # early wait + vocabolario
@@ -107,15 +106,21 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         self._http = get_async_client(hass)
 
         # Endpoint e parametri Azure
-        self._endpoint: str = (conf.get(CONF_ENDPOINT) or conf.get("api_base", "")).rstrip("/")
+        self._endpoint: str = (
+            conf.get(CONF_ENDPOINT) or conf.get("api_base", "")
+        ).rstrip("/")
         self._deployment: str = conf.get(CONF_DEPLOYMENT) or conf.get("chat_model", "")
         self._api_version: str = self._normalize_api_version(conf)
         self._timeout: int = self._coerce_int(conf.get("api_timeout"), 30)
         self._force_mode: str = conf.get(CONF_FORCE_MODE, "auto")  # auto|responses|chat
 
         # Early wait: abilita + secondi (con fallback legacy)
-        self._early_wait_enabled: bool = self._coerce_bool(conf.get(CONF_EARLY_WAIT_ENABLE), True)
-        early_secs = conf.get(CONF_EARLY_WAIT_SECONDS, conf.get(LEGACY_CONF_EARLY_TIMEOUT_SECONDS, 5))
+        self._early_wait_enabled: bool = self._coerce_bool(
+            conf.get(CONF_EARLY_WAIT_ENABLE), True
+        )
+        early_secs = conf.get(
+            CONF_EARLY_WAIT_SECONDS, conf.get(LEGACY_CONF_EARLY_TIMEOUT_SECONDS, 5)
+        )
         self._early_timeout: int = max(1, self._coerce_int(early_secs, 5))
 
         self._headers_json = {
@@ -131,9 +136,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         }
 
         # Impostazioni logging
-        self._log_level: str = str(conf.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL)).strip().lower()
-        self._log_payload_request: bool = bool(conf.get(CONF_LOG_PAYLOAD_REQUEST, False))
-        self._log_payload_response: bool = bool(conf.get(CONF_LOG_PAYLOAD_RESPONSE, False))
+        self._log_level: str = (
+            str(conf.get(CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL)).strip().lower()
+        )
+        self._log_payload_request: bool = bool(
+            conf.get(CONF_LOG_PAYLOAD_REQUEST, False)
+        )
+        self._log_payload_response: bool = bool(
+            conf.get(CONF_LOG_PAYLOAD_RESPONSE, False)
+        )
         self._log_system_message: bool = bool(conf.get(CONF_LOG_SYSTEM_MESSAGE, False))
         self._log_max_payload_chars: int = self._coerce_int(
             conf.get(CONF_LOG_MAX_PAYLOAD_CHARS), DEFAULT_LOG_MAX_PAYLOAD_CHARS
@@ -144,20 +155,28 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
 
         # Debug SSE
         self._debug_sse: bool = self._coerce_bool(conf.get(CONF_DEBUG_SSE), False)
-        self._debug_sse_lines: int = self._coerce_int(conf.get(CONF_DEBUG_SSE_LINES), 10)
+        self._debug_sse_lines: int = self._coerce_int(
+            conf.get(CONF_DEBUG_SSE_LINES), 10
+        )
 
         # Web Search opzionale: supporto sia a chiave legacy (enable_web_search) sia a nuova (web_search)
-        enable_search = self._coerce_bool(conf.get(CONF_ENABLE_SEARCH) or conf.get(CONF_WEB_SEARCH), False)
+        enable_search = self._coerce_bool(
+            conf.get(CONF_ENABLE_SEARCH) or conf.get(CONF_WEB_SEARCH), False
+        )
         self._search: WebSearchClient | None = None
         if enable_search:
             self._search = WebSearchClient(
                 api_key=str(conf.get(CONF_BING_KEY, "")),
-                endpoint=conf.get(CONF_BING_ENDPOINT, WebSearchClient.BING_ENDPOINT_DEFAULT),
+                endpoint=conf.get(
+                    CONF_BING_ENDPOINT, WebSearchClient.BING_ENDPOINT_DEFAULT
+                ),
                 max_results=self._coerce_int(conf.get(CONF_BING_MAX), 5),
             )
 
         # Vocabolario: abilita/disable + file sinonimi (fallback per chiavi legacy)
-        self._vocabulary_enable: bool = self._coerce_bool(conf.get(CONF_VOCABULARY_ENABLE), True)
+        self._vocabulary_enable: bool = self._coerce_bool(
+            conf.get(CONF_VOCABULARY_ENABLE), True
+        )
         syn_file = conf.get(CONF_SYNONYMS_FILE)
         if syn_file:
             syn_file = syn_file.strip()
@@ -166,10 +185,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         self._synonyms_file: str | None = syn_file
         self._synonyms_loaded: bool = False
         self._token_synonyms: dict[str, str] = {}  # "luci" -> "luce"
-        self._compiled_regex_rules: list[tuple[re.Pattern[str], str]] = []  # (pattern, replace)
+        self._compiled_regex_rules: list[
+            tuple[re.Pattern[str], str]
+        ] = []  # (pattern, replace)
 
         # Intent locale
-        self._local_intent_enable: bool = self._coerce_bool(conf.get(CONF_LOCAL_INTENT_ENABLE), True)
+        self._local_intent_enable: bool = self._coerce_bool(
+            conf.get(CONF_LOCAL_INTENT_ENABLE), True
+        )
         self._stopwords_it: set[str] = {
             "il",
             "lo",
@@ -206,9 +229,13 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         }
 
         # Log frasi passate al modello
-        self._log_utterances: bool = self._coerce_bool(conf.get(CONF_LOG_UTTERANCES), True)
+        self._log_utterances: bool = self._coerce_bool(
+            conf.get(CONF_LOG_UTTERANCES), True
+        )
         # Percorso: default .storage; se l'utente indica una cartella, aggiungi filename
-        default_utt_path = hass.config.path(".storage/azure_openai_conversation_utterances.log")
+        default_utt_path = hass.config.path(
+            ".storage/azure_openai_conversation_utterances.log"
+        )
         user_path = conf.get(CONF_UTTERANCES_LOG_PATH)
         final_path: str
         if not user_path:
@@ -365,7 +392,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             return tp
         # 2) Euristica per famiglie di modelli recenti che richiedono max_completion_tokens anche su 2025-01
         model = (self._deployment or "").lower()
-        if model.startswith("gpt-5") or model.startswith("gpt-4.1") or model.startswith("gpt-4.2"):
+        if (
+            model.startswith("gpt-5")
+            or model.startswith("gpt-4.1")
+            or model.startswith("gpt-4.2")
+        ):
             return "max_completion_tokens"
         # 3) Fallback alla regola per api-version
         y, m, d = self._ver_date_tuple(self._api_version)
@@ -432,7 +463,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         except Exception:  # noqa: BLE001
             return str(val)
 
-    async def _render_system_message(self, raw_sys_msg: str, azure_ctx: dict[str, Any]) -> str:
+    async def _render_system_message(
+        self, raw_sys_msg: str, azure_ctx: dict[str, Any]
+    ) -> str:
         """Renderizza il system_message; fallback: sostituzione regex per {{ azure.* }}."""
         sys_msg = raw_sys_msg
         # 1) Prova render Jinja con HATemplate (azure + exposed_entities)
@@ -445,7 +478,10 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 }
             )
         except Exception as err:  # noqa: BLE001
-            self._log_debug("System message template render failed, will try regex fallback: %s", err)
+            self._log_debug(
+                "System message template render failed, will try regex fallback: %s",
+                err,
+            )
 
         # 2) Fallback: sostituisci tutti i {{ azure.xxx }} rimasti
         pat = re.compile(r"{{\s*azure\.([a-zA-Z0-9_]+)\s*}}")
@@ -495,12 +531,20 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 drop.append(key)
         for key in drop:
             rec = pending.pop(key, None)
-            if rec and isinstance(rec.get("task"), asyncio.Task) and not rec["task"].done():
-                self._log_warn("Cancelling expired background request for conversation_id=%s", key)
+            if (
+                rec
+                and isinstance(rec.get("task"), asyncio.Task)
+                and not rec["task"].done()
+            ):
+                self._log_warn(
+                    "Cancelling expired background request for conversation_id=%s", key
+                )
                 rec["task"].cancel()
 
     @staticmethod
-    def _parse_wait_seconds(text: str, minimum: int = 1, maximum: int = 600) -> int | None:
+    def _parse_wait_seconds(
+        text: str, minimum: int = 1, maximum: int = 600
+    ) -> int | None:
         """Ritorna i secondi da attendere se il testo è un numero valido, altrimenti None."""
         m = re.fullmatch(r"\s*(\d+)\s*", text or "")
         if not m:
@@ -553,8 +597,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 "luci cucina": "cucina",
             },
             "regex_rules": [
-                {"pattern": r"\b(spegni|accendi)\s+(il|lo|la|i|gli|le|l')\s+", "replace": r"\1 "},
-                {"pattern": r"\b(luce|luci)\s+(del|della|dello|dei|degli|delle)\s+(tavolo)\b", "replace": r"\3"},
+                {
+                    "pattern": r"\b(spegni|accendi)\s+(il|lo|la|i|gli|le|l')\s+",
+                    "replace": r"\1 ",
+                },
+                {
+                    "pattern": r"\b(luce|luci)\s+(del|della|dello|dei|degli|delle)\s+(tavolo)\b",
+                    "replace": r"\3",
+                },
                 {"pattern": r"\b(luce|luci)\s+tavolo\b", "replace": "tavolo"},
                 {"pattern": r"\btavolo\s+cucina\b", "replace": "tavolo"},
                 {"pattern": r"\s{2,}", "replace": " "},
@@ -567,6 +617,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         spec = self._default_synonyms_spec()
         if self._synonyms_file and os.path.isfile(self._synonyms_file):
             try:
+
                 def _read() -> dict[str, Any]:
                     with open(self._synonyms_file, "r", encoding="utf-8") as f:
                         return json.load(f)
@@ -589,7 +640,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         len(spec["regex_rules"]),
                     )
             except Exception as err:  # noqa: BLE001
-                self._log_error("Failed to load synonyms file (%s): %r", self._synonyms_file, err)
+                self._log_error(
+                    "Failed to load synonyms file (%s): %r", self._synonyms_file, err
+                )
 
         # Costruisci mappa e regex compilate
         token_synonyms: dict[str, str] = {}
@@ -627,7 +680,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
 
         # Sostituzioni full-phrase ordinate per lunghezza
         if self._token_synonyms:
-            for src in sorted(self._token_synonyms.keys(), key=lambda x: len(x), reverse=True):
+            for src in sorted(
+                self._token_synonyms.keys(), key=lambda x: len(x), reverse=True
+            ):
                 dst = self._token_synonyms[src]
                 try:
                     s = re.sub(rf"\b{re.escape(src)}\b", dst, s, flags=re.IGNORECASE)
@@ -671,7 +726,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             await self._hass.async_add_executor_job(_write)
         except Exception as err:  # noqa: BLE001
             # errore sempre visibile
-            _LOGGER.error("Failed writing utterance log to %s: %r", self._utterances_log_path, err)
+            _LOGGER.error(
+                "Failed writing utterance log to %s: %r", self._utterances_log_path, err
+            )
 
     # -------------------- local intent: parse, match, execute --------------------
 
@@ -737,7 +794,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         top_score = out[0][0]
         return [ent for sc, ent in out if sc >= (top_score * 0.9)]
 
-    async def _execute_onoff(self, action: str, entity_ids: list[str]) -> list[tuple[str, bool, str]]:
+    async def _execute_onoff(
+        self, action: str, entity_ids: list[str]
+    ) -> list[tuple[str, bool, str]]:
         """Esegue homeassistant.turn_on/off sugli entity_ids, ritorna [(entity_id, ok, err_msg)]."""
         results: list[tuple[str, bool, str]] = []
         if not entity_ids:
@@ -745,7 +804,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         service = "turn_off" if action == "spegni" else "turn_on"
         data = {"entity_id": entity_ids}
         try:
-            await self._hass.services.async_call("homeassistant", service, data, blocking=True)
+            await self._hass.services.async_call(
+                "homeassistant", service, data, blocking=True
+            )
             for eid in entity_ids:
                 results.append((eid, True, ""))
             self._log_info("Local intent executed %s on %s", service, entity_ids)
@@ -753,10 +814,17 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             msg = f"{type(err).__name__}: {err}"
             for eid in entity_ids:
                 results.append((eid, False, msg))
-            self._log_error("Local intent failed %s on %s: %s", service, entity_ids, msg)
+            self._log_error(
+                "Local intent failed %s on %s: %s", service, entity_ids, msg
+            )
         return results
 
-    def _summarize_execution(self, language: str | None, action: str, exec_results: list[tuple[str, bool, str]]) -> str:
+    def _summarize_execution(
+        self,
+        language: str | None,
+        action: str,
+        exec_results: list[tuple[str, bool, str]],
+    ) -> str:
         """Crea un testo riassuntivo dell'azione eseguita."""
         lang_it = (language or "").lower().startswith("it")
         verb = "spento" if action == "spegni" else "acceso"
@@ -768,7 +836,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 st = self._hass.states.get(eid)
                 fname = (st and (st.name or eid)) or eid
                 if ok:
-                    lines.append(f"- {fname}: {('off' if action == 'spegni' else 'on')}.")
+                    lines.append(
+                        f"- {fname}: {('off' if action == 'spegni' else 'on')}."
+                    )
                 else:
                     lines.append(f"- {fname}: errore ({err}).")
             header = f"Sono {('in procinto di ' if any(ok for _, ok, _ in exec_results) else '')}{verb} "
@@ -811,7 +881,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         task,
                     )
                     try:
-                        result_text = await asyncio.wait_for(asyncio.shield(task), timeout=wait_secs)
+                        result_text = await asyncio.wait_for(
+                            asyncio.shield(task), timeout=wait_secs
+                        )
                     except asyncio.TimeoutError:
                         msg = (
                             f"Ancora nessuna risposta dopo {wait_secs}s. "
@@ -824,7 +896,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                             "any other text will stop waiting. "
                             "The request is still running in the background."
                         )
-                        response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))
+                        response = intent_helper.IntentResponse(
+                            language=getattr(user_input, "language", None)
+                        )
                         response.async_set_speech(msg)
                         return conversation.ConversationResult(
                             response=response,
@@ -841,10 +915,16 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     else:
                         self._pending_map().pop(conv_id, None)
 
-                    response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))
-                    speak = self._safe_speech(getattr(user_input, "language", None), result_text)
+                    response = intent_helper.IntentResponse(
+                        language=getattr(user_input, "language", None)
+                    )
+                    speak = self._safe_speech(
+                        getattr(user_input, "language", None), result_text
+                    )
                     if not (result_text or "").strip():
-                        self._log_warn("Background task completed with empty text; using fallback speech")
+                        self._log_warn(
+                            "Background task completed with empty text; using fallback speech"
+                        )
                     response.async_set_speech(speak)
                     return conversation.ConversationResult(
                         response=response,
@@ -862,7 +942,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         if (user_input.language or "").lower().startswith("it")
                         else "Okay, stopping the wait. The request keeps running in background; check the logs."
                     )
-                    response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))
+                    response = intent_helper.IntentResponse(
+                        language=getattr(user_input, "language", None)
+                    )
                     response.async_set_speech(stop_msg)
                     return conversation.ConversationResult(
                         response=response,
@@ -882,12 +964,24 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     entity_ids = [m["entity_id"] for m in matches]
                     exec_results = await self._execute_onoff(action, entity_ids)
                 else:
-                    self._log_info("Local intent recognized (%s) but no matching entities for tokens=%s", action, tokens)
+                    self._log_info(
+                        "Local intent recognized (%s) but no matching entities for tokens=%s",
+                        action,
+                        tokens,
+                    )
 
-                summary = self._summarize_execution(getattr(user_input, "language", None), action, exec_results)
-                await self._append_utterance_log(conv_id, "local_intent", text_raw, normalized_text)
-                response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))
-                response.async_set_speech(self._safe_speech(getattr(user_input, "language", None), summary))
+                summary = self._summarize_execution(
+                    getattr(user_input, "language", None), action, exec_results
+                )
+                await self._append_utterance_log(
+                    conv_id, "local_intent", text_raw, normalized_text
+                )
+                response = intent_helper.IntentResponse(
+                    language=getattr(user_input, "language", None)
+                )
+                response.async_set_speech(
+                    self._safe_speech(getattr(user_input, "language", None), summary)
+                )
                 return conversation.ConversationResult(
                     response=response,
                     conversation_id=user_input.conversation_id,
@@ -899,11 +993,17 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         elif self._force_mode == "chat":
             use_responses = False
         else:
-            use_responses = bool(self._deployment and self._deployment.lower().startswith("o"))
+            use_responses = bool(
+                self._deployment and self._deployment.lower().startswith("o")
+            )
 
         def _responses_token_param_for_version(ver: str) -> str:
             y, m, d = self._ver_date_tuple(ver)
-            return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"
+            return (
+                "max_output_tokens"
+                if (y, m, d) >= (2025, 3, 1)
+                else "max_completion_tokens"
+            )
 
         effective_version_for_mode = (
             self._ensure_min_version(self._api_version, "2025-03-01-preview")
@@ -917,10 +1017,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         )
 
         search_enabled = self._coerce_bool(
-            self._conf.get(CONF_ENABLE_SEARCH) or self._conf.get(CONF_WEB_SEARCH, False), False
+            self._conf.get(CONF_ENABLE_SEARCH)
+            or self._conf.get(CONF_WEB_SEARCH, False),
+            False,
         )
         default_ctx_size = RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE if search_enabled else 0
-        web_ctx_size = self._coerce_int(self._conf.get(CONF_WEB_SEARCH_CONTEXT_SIZE), default_ctx_size)
+        web_ctx_size = self._coerce_int(
+            self._conf.get(CONF_WEB_SEARCH_CONTEXT_SIZE), default_ctx_size
+        )
         if web_ctx_size < 0:
             web_ctx_size = 0
         if search_enabled and web_ctx_size == 0:
@@ -945,7 +1049,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             "early_timeout_seconds": self._early_timeout,
         }
 
-        raw_sys_msg = self._conf.get("system_message") or "You are Home Assistant’s AI helper."
+        raw_sys_msg = (
+            self._conf.get("system_message") or "You are Home Assistant’s AI helper."
+        )
         sys_msg = await self._render_system_message(raw_sys_msg, azure_ctx)
 
         unresolved_azure = bool(re.search(r"{{\s*azure\.", sys_msg))
@@ -978,14 +1084,19 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 search_md = ""
             if search_md:
                 messages_chat.append(
-                    {"role": "system", "content": "Real-time web search results:\n\n" + search_md}
+                    {
+                        "role": "system",
+                        "content": "Real-time web search results:\n\n" + search_md,
+                    }
                 )
 
         user_msg_for_model = normalized_text if self._vocabulary_enable else text_raw
         messages_chat.append({"role": "user", "content": user_msg_for_model})
 
         mode_label = "responses" if use_responses else "chat"
-        await self._append_utterance_log(conv_id, mode_label, text_raw, user_msg_for_model)
+        await self._append_utterance_log(
+            conv_id, mode_label, text_raw, user_msg_for_model
+        )
 
         self._log_debug(
             "Starting conversation using %s API (deployment=%s, api-version configured=%s)",
@@ -1008,7 +1119,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         )
                     )
                     try:
-                        await asyncio.wait_for(first_chunk_event.wait(), timeout=self._early_timeout)
+                        await asyncio.wait_for(
+                            first_chunk_event.wait(), timeout=self._early_timeout
+                        )
                         text_out = await task
                     except asyncio.TimeoutError:
                         self._log_error(
@@ -1024,8 +1137,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                                 "mode": "responses",
                                 "expire": exp,
                             }
-                            task.add_done_callback(lambda fut, cid=conv_id: self._pending_map().pop(cid, None))
-                        text_out = self._quick_fail_message(getattr(user_input, "language", None), self._early_timeout)
+                            task.add_done_callback(
+                                lambda fut, cid=conv_id: self._pending_map().pop(
+                                    cid, None
+                                )
+                            )
+                        text_out = self._quick_fail_message(
+                            getattr(user_input, "language", None), self._early_timeout
+                        )
                 else:
                     text_out = await self._responses_stream_run(
                         messages_chat=messages_chat,
@@ -1042,7 +1161,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         )
                     )
                     try:
-                        await asyncio.wait_for(first_chunk_event.wait(), timeout=self._early_timeout)
+                        await asyncio.wait_for(
+                            first_chunk_event.wait(), timeout=self._early_timeout
+                        )
                         text_out = await task
                     except asyncio.TimeoutError:
                         self._log_error(
@@ -1058,8 +1179,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                                 "mode": "chat",
                                 "expire": exp,
                             }
-                            task.add_done_callback(lambda fut, cid=conv_id: self._pending_map().pop(cid, None))
-                        text_out = self._quick_fail_message(getattr(user_input, "language", None), self._early_timeout)
+                            task.add_done_callback(
+                                lambda fut, cid=conv_id: self._pending_map().pop(
+                                    cid, None
+                                )
+                            )
+                        text_out = self._quick_fail_message(
+                            getattr(user_input, "language", None), self._early_timeout
+                        )
                 else:
                     text_out = await self._chat_stream_run(
                         messages_chat=messages_chat,
@@ -1081,10 +1208,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         if self._should_log_payload_response() and text_out:
             self._log_info("Response text: %s", text_out)
 
-        response = intent_helper.IntentResponse(language=getattr(user_input, "language", None))
+        response = intent_helper.IntentResponse(
+            language=getattr(user_input, "language", None)
+        )
         speak = self._safe_speech(getattr(user_input, "language", None), text_out)
         if not (text_out or "").strip():
-            self._log_warn("Model returned empty text; sending fallback speech to avoid frontend crash")
+            self._log_warn(
+                "Model returned empty text; sending fallback speech to avoid frontend crash"
+            )
         response.async_set_speech(speak)
 
         return conversation.ConversationResult(
@@ -1125,7 +1256,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         while True:
             if res_token_param is None:
                 y, mn, d = self._ver_date_tuple(next_version)
-                res_token_param = "max_output_tokens" if (y, mn, d) >= (2025, 3, 1) else "max_completion_tokens"
+                res_token_param = (
+                    "max_output_tokens"
+                    if (y, mn, d) >= (2025, 3, 1)
+                    else "max_completion_tokens"
+                )
 
             fmt = "messages" if use_messages_format else "input"
             pair_key = f"{next_version}::{res_token_param}::fmt={fmt}"
@@ -1170,29 +1305,48 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                             err_json = json.loads(text_body or "{}")
                         except Exception:
                             err_json = {}
-                        msg = err_json.get("error", {}).get("message") or text_body or f"HTTP {resp.status_code}"
+                        msg = (
+                            err_json.get("error", {}).get("message")
+                            or text_body
+                            or f"HTTP {resp.status_code}"
+                        )
                         self._log_error("Azure responses stream error: %s", msg)
 
                         if (
-                            "Responses API is enabled only for api-version 2025-03-01-preview" in msg
+                            "Responses API is enabled only for api-version 2025-03-01-preview"
+                            in msg
                             and next_version != "2025-03-01-preview"
                         ):
-                            self._log_debug("Retrying Responses with api-version=2025-03-01-preview")
+                            self._log_debug(
+                                "Retrying Responses with api-version=2025-03-01-preview"
+                            )
                             next_version = "2025-03-01-preview"
                             res_token_param = None
                             continue
 
-                        if "Unsupported parameter: 'max_completion_tokens'" in msg and res_token_param != "max_output_tokens":
-                            self._log_debug("Retrying Responses switching token param to max_output_tokens")
+                        if (
+                            "Unsupported parameter: 'max_completion_tokens'" in msg
+                            and res_token_param != "max_output_tokens"
+                        ):
+                            self._log_debug(
+                                "Retrying Responses switching token param to max_output_tokens"
+                            )
                             res_token_param = "max_output_tokens"
                             continue
-                        if "Unsupported parameter: 'max_output_tokens'" in msg and res_token_param != "max_completion_tokens":
-                            self._log_debug("Retrying Responses switching token param to max_completion_tokens")
+                        if (
+                            "Unsupported parameter: 'max_output_tokens'" in msg
+                            and res_token_param != "max_completion_tokens"
+                        ):
+                            self._log_debug(
+                                "Retrying Responses switching token param to max_completion_tokens"
+                            )
                             res_token_param = "max_completion_tokens"
                             continue
 
                         if not use_messages_format:
-                            self._log_debug("Retrying Responses switching to messages+instructions format")
+                            self._log_debug(
+                                "Retrying Responses switching to messages+instructions format"
+                            )
                             use_messages_format = True
                             continue
 
@@ -1202,9 +1356,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     current_event: str | None = None
                     data_lines: list[str] = []
                     debug_samples: list[str] = []
-                    collect_sse_samples = self._debug_sse or self._should_log_payload_response()
+                    collect_sse_samples = (
+                        self._debug_sse or self._should_log_payload_response()
+                    )
                     if collect_sse_samples:
-                        debug_limit = self._debug_sse_lines if self._debug_sse else self._log_max_sse_lines
+                        debug_limit = (
+                            self._debug_sse_lines
+                            if self._debug_sse
+                            else self._log_max_sse_lines
+                        )
                     else:
                         debug_limit = 0
 
@@ -1279,7 +1439,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                             ):
                                 _consume(payload_obj.get("delta") or payload_obj)
                             elif event_name in ("response.error",):
-                                self._log_error("Azure responses error event: %s", payload_obj)
+                                self._log_error(
+                                    "Azure responses error event: %s", payload_obj
+                                )
                                 break
                             elif event_name in (
                                 "response.completed",
@@ -1369,7 +1531,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 )
                 break
             except Exception as err:  # noqa: BLE001
-                self._log_error("Responses streaming failed (%s): %r", type(err).__name__, err)
+                self._log_error(
+                    "Responses streaming failed (%s): %r", type(err).__name__, err
+                )
                 break
 
         if not text_out:
@@ -1384,7 +1548,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 first_event.set()
 
         if not text_out and not (self._deployment or "").lower().startswith("o"):
-            self._log_debug("Responses non-stream produced no text; falling back to Chat Completions")
+            self._log_debug(
+                "Responses non-stream produced no text; falling back to Chat Completions"
+            )
             text_out = await self._chat_stream_run(messages_chat)
             if text_out and first_event and not first_seen:
                 first_event.set()
@@ -1399,9 +1565,12 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         first_event: asyncio.Event | None = None,
     ) -> str:
         """Esegue Chat Completions (stream) e restituisce il testo aggregato."""
+
         def _chat_token_param_for_version(ver: str) -> str:
             y, m, d = self._ver_date_tuple(ver)
-            return "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"
+            return (
+                "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"
+            )
 
         text_out = ""
         first_seen = False
@@ -1445,20 +1614,39 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                             err_json = json.loads(txt or "{}")
                         except Exception:
                             err_json = {}
-                        msg = err_json.get("error", {}).get("message") or txt or f"HTTP {resp.status_code}"
+                        msg = (
+                            err_json.get("error", {}).get("message")
+                            or txt
+                            or f"HTTP {resp.status_code}"
+                        )
                         self._log_error("Azure chat stream error: %s", msg)
 
-                        if "Unsupported parameter: 'max_tokens'" in msg and token_param != "max_completion_tokens":
-                            self._log_debug("Retrying Chat switching token param to max_completion_tokens")
+                        if (
+                            "Unsupported parameter: 'max_tokens'" in msg
+                            and token_param != "max_completion_tokens"
+                        ):
+                            self._log_debug(
+                                "Retrying Chat switching token param to max_completion_tokens"
+                            )
                             token_param = "max_completion_tokens"
                             continue
-                        if "Unsupported parameter: 'max_completion_tokens'" in msg and token_param != "max_tokens":
-                            self._log_debug("Retrying Chat switching token param to max_tokens")
+                        if (
+                            "Unsupported parameter: 'max_completion_tokens'" in msg
+                            and token_param != "max_tokens"
+                        ):
+                            self._log_debug(
+                                "Retrying Chat switching token param to max_tokens"
+                            )
                             token_param = "max_tokens"
                             continue
 
-                        if "api-version 2025-03-01-preview" in msg and next_version != "2025-03-01-preview":
-                            self._log_debug("Retrying Chat with api-version=2025-03-01-preview")
+                        if (
+                            "api-version 2025-03-01-preview" in msg
+                            and next_version != "2025-03-01-preview"
+                        ):
+                            self._log_debug(
+                                "Retrying Chat with api-version=2025-03-01-preview"
+                            )
                             next_version = "2025-03-01-preview"
                             token_param = _chat_token_param_for_version(next_version)
                             continue
@@ -1466,9 +1654,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                         break
 
                     sse_samples: list[str] = []
-                    collect_samples = self._should_log_payload_response() or self._debug_sse
+                    collect_samples = (
+                        self._should_log_payload_response() or self._debug_sse
+                    )
                     if collect_samples:
-                        debug_limit = self._debug_sse_lines if self._debug_sse else self._log_max_sse_lines
+                        debug_limit = (
+                            self._debug_sse_lines
+                            if self._debug_sse
+                            else self._log_max_sse_lines
+                        )
                     else:
                         debug_limit = 0
 
@@ -1526,7 +1720,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 )
                 break
             except Exception as err:  # noqa: BLE001
-                self._log_error("Chat streaming failed (%s): %r", type(err).__name__, err)
+                self._log_error(
+                    "Chat streaming failed (%s): %r", type(err).__name__, err
+                )
                 break
 
             break
@@ -1557,7 +1753,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
 
         def _responses_token_param_for_version(ver: str) -> str:
             y, m, d = self._ver_date_tuple(ver)
-            return "max_output_tokens" if (y, m, d) >= (2025, 3, 1) else "max_completion_tokens"
+            return (
+                "max_output_tokens"
+                if (y, m, d) >= (2025, 3, 1)
+                else "max_completion_tokens"
+            )
 
         token_param = _responses_token_param_for_version(api_version)
         payload: dict[str, Any] = {
@@ -1589,7 +1789,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 timeout=self._timeout,
             )
         except Exception as err:  # noqa: BLE001
-            self._log_error("Azure responses (non-stream) request failed (%s): %r", type(err).__name__, err)
+            self._log_error(
+                "Azure responses (non-stream) request failed (%s): %r",
+                type(err).__name__,
+                err,
+            )
             return ""
 
         if resp.status_code >= 400:

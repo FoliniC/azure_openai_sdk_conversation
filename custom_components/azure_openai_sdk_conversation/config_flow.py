@@ -14,7 +14,6 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_API_KEY
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
 from homeassistant.helpers.httpx_client import get_async_client  # noqa: F401
 from homeassistant.helpers.selector import (
@@ -24,7 +23,6 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TemplateSelector,
 )
 from homeassistant.helpers.typing import VolDictType
 
@@ -35,23 +33,11 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
-    CONF_REASONING_EFFORT,
     CONF_RECOMMENDED,
-    CONF_TEMPERATURE,
-    CONF_TOP_P,
-    CONF_WEB_SEARCH,
-    CONF_WEB_SEARCH_CONTEXT_SIZE,
-    CONF_WEB_SEARCH_USER_LOCATION,
     CONF_EXPOSED_ENTITIES_LIMIT,
     DOMAIN,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
-    RECOMMENDED_REASONING_EFFORT,
-    RECOMMENDED_TEMPERATURE,
-    RECOMMENDED_TOP_P,
-    RECOMMENDED_WEB_SEARCH,
-    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,
-    RECOMMENDED_WEB_SEARCH_USER_LOCATION,
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
     # logging
     CONF_LOG_LEVEL,
@@ -78,7 +64,7 @@ from .const import (
     RECOMMENDED_EARLY_WAIT_SECONDS,
     RECOMMENDED_VOCABULARY_ENABLE,
 )
-from .utils import APIVersionManager, AzureOpenAILogger, AzureOpenAIValidator
+from .utils import AzureOpenAILogger, AzureOpenAIValidator
 
 _LOGGER = logging.getLogger(__name__)
 _LOG = AzureOpenAILogger(__name__)
@@ -94,6 +80,7 @@ STEP_USER_SCHEMA = vol.Schema(
     }
 )
 
+
 # -----------------------------------------------------------------------------
 class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Azure OpenAI SDK Conversation."""
@@ -108,7 +95,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self._step1_data: dict[str, Any] | None = None
 
     # --------------------------------------------------------------------- STEP 1
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the initial step. Validates credentials and fetches capabilities."""
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
@@ -117,7 +106,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_API_KEY: user_input[CONF_API_KEY],
             CONF_API_BASE: user_input[CONF_API_BASE].strip(),
             CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),
-            CONF_API_VERSION: user_input.get(CONF_API_VERSION, DEFAULT_API_VERSION).strip(),
+            CONF_API_VERSION: user_input.get(
+                CONF_API_VERSION, DEFAULT_API_VERSION
+            ).strip(),
         }
 
         errors: dict[str, str] = {}
@@ -132,13 +123,18 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         try:
-            self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])
+            self._validated = await validator.validate(
+                self._step1_data[CONF_API_VERSION]
+            )
             self._sampling_caps = await validator.capabilities()
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.exception("Validation failed: %s", err)
             # Improved mapping heuristics for UI
             emsg = str(err).lower()
-            if any(x in emsg for x in ["401", "403", "forbidden", "unauthorized", "invalid api key"]):
+            if any(
+                x in emsg
+                for x in ["401", "403", "forbidden", "unauthorized", "invalid api key"]
+            ):
                 errors["base"] = "invalid_auth"
             elif any(x in emsg for x in ["not found", "deployment", "404"]):
                 errors["base"] = "invalid_deployment"
@@ -148,12 +144,16 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
 
         if errors:
-            return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors)
+            return self.async_show_form(
+                step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
+            )
 
         return await self.async_step_params()
 
     # ------------------------------------------------------------------ STEP 2
-    async def async_step_params(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_params(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle parameter configuration step with dynamic schema based on capabilities."""
         assert self._step1_data is not None
 
@@ -178,35 +178,68 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                 cap_schema[vol.Optional(name, default=default)] = str
 
         # Added log settings (we keep the UI consistent)
-        cap_schema[vol.Optional(CONF_LOG_LEVEL, default=DEFAULT_LOG_LEVEL)] = SelectSelector(
-            SelectSelectorConfig(
-                options=[LOG_LEVEL_NONE, LOG_LEVEL_ERROR, LOG_LEVEL_INFO, LOG_LEVEL_TRACE],
-                mode=SelectSelectorMode.DROPDOWN,
+        cap_schema[vol.Optional(CONF_LOG_LEVEL, default=DEFAULT_LOG_LEVEL)] = (
+            SelectSelector(
+                SelectSelectorConfig(
+                    options=[
+                        LOG_LEVEL_NONE,
+                        LOG_LEVEL_ERROR,
+                        LOG_LEVEL_INFO,
+                        LOG_LEVEL_TRACE,
+                    ],
+                    mode=SelectSelectorMode.DROPDOWN,
+                )
             )
         )
-        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_REQUEST, default=False)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_RESPONSE, default=False)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_LOG_SYSTEM_MESSAGE, default=False)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_LOG_MAX_PAYLOAD_CHARS, default=DEFAULT_LOG_MAX_PAYLOAD_CHARS)] = NumberSelector(
+        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_REQUEST, default=False)] = (
+            BooleanSelector()
+        )
+        cap_schema[vol.Optional(CONF_LOG_PAYLOAD_RESPONSE, default=False)] = (
+            BooleanSelector()
+        )
+        cap_schema[vol.Optional(CONF_LOG_SYSTEM_MESSAGE, default=False)] = (
+            BooleanSelector()
+        )
+        cap_schema[
+            vol.Optional(
+                CONF_LOG_MAX_PAYLOAD_CHARS, default=DEFAULT_LOG_MAX_PAYLOAD_CHARS
+            )
+        ] = NumberSelector(
             NumberSelectorConfig(min=100, max=500000, step=100, mode="box")
         )
-        cap_schema[vol.Optional(CONF_LOG_MAX_SSE_LINES, default=DEFAULT_LOG_MAX_SSE_LINES)] = NumberSelector(
-            NumberSelectorConfig(min=1, max=200, step=1, mode="box")
-        )
+        cap_schema[
+            vol.Optional(CONF_LOG_MAX_SSE_LINES, default=DEFAULT_LOG_MAX_SSE_LINES)
+        ] = NumberSelector(NumberSelectorConfig(min=1, max=200, step=1, mode="box"))
 
         # Early wait: enable and seconds
-        cap_schema[vol.Optional(CONF_EARLY_WAIT_ENABLE, default=RECOMMENDED_EARLY_WAIT_ENABLE)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_EARLY_WAIT_SECONDS, default=RECOMMENDED_EARLY_WAIT_SECONDS)] = NumberSelector(
-            NumberSelectorConfig(min=1, max=120, step=1, mode="box")
-        )
+        cap_schema[
+            vol.Optional(CONF_EARLY_WAIT_ENABLE, default=RECOMMENDED_EARLY_WAIT_ENABLE)
+        ] = BooleanSelector()
+        cap_schema[
+            vol.Optional(
+                CONF_EARLY_WAIT_SECONDS, default=RECOMMENDED_EARLY_WAIT_SECONDS
+            )
+        ] = NumberSelector(NumberSelectorConfig(min=1, max=120, step=1, mode="box"))
 
         # Vocabulary: enable and synonyms file
-        cap_schema[vol.Optional(CONF_VOCABULARY_ENABLE, default=RECOMMENDED_VOCABULARY_ENABLE)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_SYNONYMS_FILE, default="custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json")] = str
+        cap_schema[
+            vol.Optional(CONF_VOCABULARY_ENABLE, default=RECOMMENDED_VOCABULARY_ENABLE)
+        ] = BooleanSelector()
+        cap_schema[
+            vol.Optional(
+                CONF_SYNONYMS_FILE,
+                default="custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json",
+            )
+        ] = str
 
         # Log utterances: enable and file path
         cap_schema[vol.Optional(CONF_LOG_UTTERANCES, default=True)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_UTTERANCES_LOG_PATH, default=".storage/azure_openai_conversation_utterances.log")] = str
+        cap_schema[
+            vol.Optional(
+                CONF_UTTERANCES_LOG_PATH,
+                default=".storage/azure_openai_conversation_utterances.log",
+            )
+        ] = str
 
         if not cap_schema:
             # nothing extra to ask
@@ -240,9 +273,13 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             if not errors:
                 return self._create_entry(options=cleaned)
 
-            return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema), errors=errors)
+            return self.async_show_form(
+                step_id="params", data_schema=vol.Schema(cap_schema), errors=errors
+            )
 
-        return self.async_show_form(step_id="params", data_schema=vol.Schema(cap_schema))
+        return self.async_show_form(
+            step_id="params", data_schema=vol.Schema(cap_schema)
+        )
 
     # ---------------------------------------------------------------- create
     def _create_entry(self, *, options: Mapping[str, Any]) -> ConfigFlowResult:
@@ -269,11 +306,17 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                 return (1900, 1, 1)
 
         model_l = (self._step1_data[CONF_CHAT_MODEL] or "").lower()
-        if model_l.startswith("gpt-5") or model_l.startswith("gpt-4.1") or model_l.startswith("gpt-4.2"):
+        if (
+            model_l.startswith("gpt-5")
+            or model_l.startswith("gpt-4.1")
+            or model_l.startswith("gpt-4.2")
+        ):
             chat_token_param = "max_completion_tokens"
         else:
             y, m, d = _ver_date_tuple(self._validated["api_version"])
-            chat_token_param = "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"
+            chat_token_param = (
+                "max_completion_tokens" if (y, m, d) >= (2025, 3, 1) else "max_tokens"
+            )
 
         base_opts: dict[str, Any] = {
             CONF_RECOMMENDED: False,

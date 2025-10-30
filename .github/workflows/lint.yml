@@ -1,0 +1,32 @@
+name: Linting
+
+on:
+  push:
+    paths:
+      - 'custom_components/azure_openai_sdk_conversation/**'
+      - '.github/workflows/lint.yml'
+  pull_request:
+    paths:
+      - 'custom_components/azure_openai_sdk_conversation/**'
+      - '.github/workflows/lint.yml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install ruff
+        run: pip install ruff
+
+      - name: Run ruff linter
+        run: ruff check custom_components/azure_openai_sdk_conversation/
+
+      - name: Run ruff formatter check
+        run: ruff format --check custom_components/azure_openai_sdk_conversation/
