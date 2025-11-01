@@ -28,7 +28,10 @@
           "reasoning_effort": "Reasoning effort",
           "web_search": "Enable web search",
           "search_context_size": "Search context size",
-          "user_location": "Include home location"
+          "user_location": "Include home location",
+          "stats_override_mode": "Statistics Override Mode",
+          "stats_aggregated_file": "Aggregated Statistics File",
+          "stats_aggregation_interval_minutes": "Statistics Aggregation Interval (minutes)"
         },
         "data_description": {
           "prompt": "Instruct how the LLM should respond. This can be a template.",
@@ -57,6 +60,13 @@
         "low": "[%key:common::state::low%]",
         "medium": "[%key:common::state::medium%]",
         "high": "[%key:common::state::high%]"
+      }
+    },
+    "stats_override_mode": {
+      "options": {
+        "default": "Default (Use Global Setting)",
+        "enable": "Enable",
+        "disable": "Disable"
       }
     }
   },

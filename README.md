@@ -17,7 +17,7 @@ This custom integration adds a conversation agent powered by Azure OpenAI in Hom
 *   **Configurable Logging**: Change log verbosity from the options UI.
 *   **Custom Template Information**: Pass custom information using Home Assistant templates.
 *   **Synonym Normalization**: Substitute similar prompts using a vocabulary.
-*   **Prompt Execution Control**: Ability to stop long-running prompts.
+*   **Prompt Execution Control**: Ability to stop long-running prompts or wait indefinitely.
 *   **History**: Stores prompt history.
 *   **Web Search**: Optional Bing search integration for real-time information.
 *   **Flexible Configuration**: Configure and modify endpoint, model, and max tokens in the options UI.
@@ -46,6 +46,17 @@ Install from HACS by adding this GitHub repository (`https://github.com/FoliniC/
 ## Configuration
 
 Configuration can be changed in the integration's options page after it has been added.
+
+### Global Settings
+
+Some global settings can be configured in your `configuration.yaml` file. Currently, this is used for enabling statistics collection for the entire component.
+
+```yaml
+azure_openai_sdk_conversation:
+  stats_enable: true
+```
+
+This global setting can be overridden on a per-instance basis in the integration's options UI.
 
 ![Configuration UI](docs/images/SetupCard.png)
 

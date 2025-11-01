@@ -1,0 +1,123 @@
+{
+  "config": {
+    "abort": {
+      "already_configured": "Già configurato. È possibile una sola configurazione."
+    },
+    "error": {
+      "cannot_connect": "Impossibile connettersi",
+      "invalid_auth": "Autenticazione non valida",
+      "unknown": "Errore imprevisto"
+    },
+    "step": {
+      "user": {
+        "description": "Ottieni l'URL di base dell'API e la versione dall'URI di destinazione in EndPoint in Azure AI Foundry o nel portale di Azure.",
+        "data": {
+          "api_key": "Chiave API",
+          "api_base": "URL di base dell'API"
+        },
+        "data_description": {
+          "api_key": "",
+          "api_base": "URL di base di esempio: https://xyz.cognitiveservices.azure.com"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "Istruzioni",
+          "chat_model": "Modello",
+          "max_tokens": "Numero massimo di token da restituire nella risposta",
+          "temperature": "Temperatura",
+          "top_p": "Top P",
+          "llm_hass_api": "Vuoi usare l'API LLM HASS?",
+          "recommended": "Impostazioni del modello consigliate",
+          "reasoning_effort": "Sforzo di ragionamento",
+          "web_search": "Abilita la ricerca web",
+          "search_context_size": "Dimensione del contesto di ricerca",
+          "user_location": "Includi la posizione della casa"
+        },
+        "data_description": {
+          "prompt": "Indica come deve rispondere il LLM. Questo può essere un modello.",
+          "reasoning_effort": "Quanti token di ragionamento il modello dovrebbe generare prima di creare una risposta al prompt (per alcuni modelli di ragionamento)",
+          "web_search": "Consenti al modello di cercare nel web le informazioni più recenti prima di generare una risposta",
+          "search_context_size": "Guida di alto livello per la quantità di spazio della finestra di contesto da utilizzare per la ricerca",
+          "user_location": "Affina i risultati della ricerca in base alla geografia"
+        }
+      }
+    },
+    "error": {
+      "model_not_supported": "Questo modello non è supportato, seleziona un modello diverso",
+      "web_search_not_supported": "La ricerca web non è supportata da questo modello"
+    }
+  },
+  "selector": {
+    "reasoning_effort": {
+      "options": {
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      }
+    },
+    "search_context_size": {
+      "options": {
+        "low": "Basso",
+        "medium": "Medio",
+        "high": "Alto"
+      }
+    }
+  },
+  "services": {
+    "generate_image": {
+      "name": "Genera immagine",
+      "description": "Trasforma un prompt in un'immagine",
+      "fields": {
+        "config_entry": {
+          "name": "Voce di configurazione",
+          "description": "La voce di configurazione da utilizzare per questa azione"
+        },
+        "prompt": {
+          "name": "Prompt",
+          "description": "Il testo da trasformare in un'immagine",
+          "example": "Una foto di un cane"
+        },
+        "size": {
+          "name": "Dimensione",
+          "description": "La dimensione dell'immagine da generare"
+        },
+        "quality": {
+          "name": "Qualità",
+          "description": "La qualità dell'immagine che verrà generata"
+        },
+        "style": {
+          "name": "Stile",
+          "description": "Lo stile dell'immagine generata"
+        }
+      }
+    },
+    "generate_content": {
+      "name": "Genera contenuto",
+      "description": "Invia una query conversazionale a ChatGPT includendo eventuali file di immagine o PDF allegati",
+      "fields": {
+        "config_entry": {
+          "name": "Voce di configurazione",
+          "description": "La voce di configurazione da utilizzare per questa azione"
+        },
+        "prompt": {
+          "name": "Prompt",
+          "description": "Il prompt da inviare"
+        },
+        "filenames": {
+          "name": "File",
+          "description": "Elenco dei file da caricare"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "invalid_config_entry": {
+      "message": "Voce di configurazione non valida fornita. Ricevuto {config_entry}"
+    }
+  }
+}

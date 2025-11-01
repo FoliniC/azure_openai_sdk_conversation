@@ -1,4 +1,18 @@
 # CHANGELOG – Azure OpenAI SDK Conversation  
+## 0.5.0 - November 2025
+
+### Features
+- **Global Statistics Configuration**: Added the ability to enable/disable statistics globally for the component via `configuration.yaml`.
+- **Per-Instance Statistics Override**: Added a per-instance override setting in the UI to force-enable or force-disable statistics, overriding the global setting.
+- **"Wait Indefinitely" for Early Wait**: Changed the "early wait" prompt to allow a user to wait indefinitely for a response by replying with any non-numeric text. The agent will now wait for the background task to complete and deliver the response in the chat.
+- **Persistent Notifications for Responses**: Implemented persistent notifications to deliver responses from backgrounded "early wait" tasks, ensuring the user receives the response even if they don't interact with the chat.
+
+### Bug Fixes
+- **Timeout Configuration**: Fixed an `httpx.ReadTimeout` error by adding specific exception handling and making the API timeout configurable in the UI.
+- **Early Wait Race Condition**: Fixed a race condition where the "early wait" continuation prompt would fail if the background task finished at the wrong time.
+- **Early Wait Trigger**: Fixed a bug where the "early wait" feature would not trigger correctly due to initial whitespace from the language model.
+- **Notification Crash**: Fixed an `AttributeError` that caused the component to crash when attempting to create a persistent notification.
+
 ## 0.4 - October 2025
 ### Higlights
 - use MCP server

@@ -5,14 +5,19 @@ from __future__ import annotations
 import logging
 from urllib.parse import urlparse
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.const import Platform, CONF_API_KEY
 from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.httpx_client import get_async_client
 
-from .utils import APIVersionManager, redact_api_key
+from .utils import APIVersionManager
 from .const import (
+    DOMAIN,
+    CONF_STATS_ENABLE,
     # logging constants used for informative log
     CONF_LOG_LEVEL,
     CONF_LOG_PAYLOAD_REQUEST,
@@ -25,10 +30,36 @@ from .const import (
     DEFAULT_LOG_MAX_SSE_LINES,
 )
 
-DOMAIN = "azure_openai_sdk_conversation"
 PLATFORMS = [Platform.CONVERSATION]
 
 _LOGGER = logging.getLogger(__name__)
+
+# Schema for global configuration via configuration.yaml
+CONFIG_SCHEMA = vol.Schema(
+    {
+        DOMAIN: vol.Schema(
+            {
+                vol.Optional(CONF_STATS_ENABLE): cv.boolean,
+            }
+        )
+    },
+    extra=vol.ALLOW_EXTRA,
+)
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the component from configuration.yaml."""
+    hass.data.setdefault(DOMAIN, {})
+    
+    # Store global config if present
+    if DOMAIN in config:
+        hass.data[DOMAIN]['global_config'] = config[DOMAIN]
+        _LOGGER.info(
+            "Azure OpenAI global config loaded: stats_enable=%s",
+            config[DOMAIN].get(CONF_STATS_ENABLE)
+        )
+        
+    return True
 
 
 def normalize_azure_endpoint(value: str | None) -> str:
@@ -95,8 +126,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         ) from err
 
     if resp.status_code in (401, 403):
-        # Do not expose the API key in logs; show a redacted variant if needed.
-        redacted = redact_api_key(data.get(CONF_API_KEY))
+        # Use simple redaction inline without importing from core.config
+        api_key = data.get(CONF_API_KEY, "")
+        redacted = f"{api_key[:3]}***{api_key[-3:]}" if len(api_key) > 8 else "***"
         raise ConfigEntryNotReady(
             f"Invalid Azure OpenAI credentials for {api_base} ({redacted})"
         )

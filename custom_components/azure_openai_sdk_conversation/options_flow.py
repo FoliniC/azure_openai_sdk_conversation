@@ -21,6 +21,7 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_API_TIMEOUT,
     CONF_API_VERSION,
     CONF_EXPOSED_ENTITIES_LIMIT,
     CONF_MAX_TOKENS,
@@ -32,6 +33,7 @@ from .const import (
     CONF_WEB_SEARCH,
     CONF_WEB_SEARCH_CONTEXT_SIZE,
     CONF_WEB_SEARCH_USER_LOCATION,
+    RECOMMENDED_API_TIMEOUT,
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
     RECOMMENDED_MAX_TOKENS,
     RECOMMENDED_REASONING_EFFORT,
@@ -64,6 +66,21 @@ from .const import (
     RECOMMENDED_EARLY_WAIT_ENABLE,
     RECOMMENDED_EARLY_WAIT_SECONDS,
     RECOMMENDED_VOCABULARY_ENABLE,
+    # MCP Server
+    CONF_MCP_ENABLED,
+    CONF_MCP_TTL_SECONDS,
+    RECOMMENDED_MCP_ENABLED,
+    RECOMMENDED_MCP_TTL_SECONDS,
+    # Statistics
+    CONF_STATS_OVERRIDE_MODE,
+    STATS_OVERRIDE_DEFAULT,
+    STATS_OVERRIDE_ENABLE,
+    STATS_OVERRIDE_DISABLE,
+    RECOMMENDED_STATS_OVERRIDE_MODE,
+    CONF_STATS_AGGREGATED_FILE,
+    RECOMMENDED_STATS_AGGREGATED_FILE,
+    CONF_STATS_AGGREGATION_INTERVAL,
+    RECOMMENDED_STATS_AGGREGATION_INTERVAL,
 )
 from .utils import APIVersionManager
 
@@ -180,6 +197,19 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         max=2000,
                         step=10,
                         mode="box",
+                    )
+                ),
+                vol.Optional(
+                    CONF_API_TIMEOUT,
+                    default=self.config_entry.options.get(
+                        CONF_API_TIMEOUT, RECOMMENDED_API_TIMEOUT
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=5,
+                        max=300,
+                        step=5,
+                        mode="slider",
                     )
                 ),
             }
@@ -390,6 +420,70 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         ".storage/azure_openai_conversation_utterances.log",
                     ),
                 ): str,
+            }
+        )
+
+        # Statistics
+        schema = schema.extend(
+            {
+                vol.Optional(
+                    CONF_STATS_OVERRIDE_MODE,
+                    default=self.config_entry.options.get(
+                        CONF_STATS_OVERRIDE_MODE, RECOMMENDED_STATS_OVERRIDE_MODE
+                    ),
+                ): SelectSelector(
+                    SelectSelectorConfig(
+                        options=[
+                            STATS_OVERRIDE_DEFAULT,
+                            STATS_OVERRIDE_ENABLE,
+                            STATS_OVERRIDE_DISABLE,
+                        ],
+                        mode=SelectSelectorMode.DROPDOWN,
+                        translation_key="stats_override_mode",
+                    )
+                ),
+                vol.Optional(
+                    CONF_STATS_AGGREGATED_FILE,
+                    default=self.config_entry.options.get(
+                        CONF_STATS_AGGREGATED_FILE,
+                        RECOMMENDED_STATS_AGGREGATED_FILE,
+                    ),
+                ): str,
+                vol.Optional(
+                    CONF_STATS_AGGREGATION_INTERVAL,
+                    default=self.config_entry.options.get(
+                        CONF_STATS_AGGREGATION_INTERVAL,
+                        RECOMMENDED_STATS_AGGREGATION_INTERVAL,
+                    ),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=5,
+                        max=1440,
+                        step=5,
+                        mode="box",
+                    )
+                ),
+            }
+        )
+
+        # MCP Server
+        schema = schema.extend(
+            {
+                vol.Optional(
+                    CONF_MCP_ENABLED,
+                    default=self.config_entry.options.get(CONF_MCP_ENABLED, RECOMMENDED_MCP_ENABLED),
+                ): BooleanSelector(),
+                vol.Optional(
+                    CONF_MCP_TTL_SECONDS,
+                    default=self.config_entry.options.get(CONF_MCP_TTL_SECONDS, RECOMMENDED_MCP_TTL_SECONDS),
+                ): NumberSelector(
+                    NumberSelectorConfig(
+                        min=300,
+                        max=7200,
+                        step=300,
+                        mode="box",
+                    )
+                ),
             }
         )
 

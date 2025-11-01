@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+
 from typing import Any, Mapping
 
 import voluptuous as vol
@@ -14,6 +15,7 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_API_KEY
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
 from homeassistant.helpers.httpx_client import get_async_client  # noqa: F401
 from homeassistant.helpers.selector import (
@@ -23,6 +25,7 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TemplateSelector,
 )
 from homeassistant.helpers.typing import VolDictType
 
@@ -33,11 +36,23 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
+    CONF_REASONING_EFFORT,
     CONF_RECOMMENDED,
+    CONF_TEMPERATURE,
+    CONF_TOP_P,
+    CONF_WEB_SEARCH,
+    CONF_WEB_SEARCH_CONTEXT_SIZE,
+    CONF_WEB_SEARCH_USER_LOCATION,
     CONF_EXPOSED_ENTITIES_LIMIT,
     DOMAIN,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_REASONING_EFFORT,
+    RECOMMENDED_TEMPERATURE,
+    RECOMMENDED_TOP_P,
+    RECOMMENDED_WEB_SEARCH,
+    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,
+    RECOMMENDED_WEB_SEARCH_USER_LOCATION,
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
     # logging
     CONF_LOG_LEVEL,
@@ -63,11 +78,15 @@ from .const import (
     RECOMMENDED_EARLY_WAIT_ENABLE,
     RECOMMENDED_EARLY_WAIT_SECONDS,
     RECOMMENDED_VOCABULARY_ENABLE,
+    # MCP Server
+    CONF_MCP_ENABLED,
+    CONF_MCP_TTL_SECONDS,
+    RECOMMENDED_MCP_ENABLED,
+    RECOMMENDED_MCP_TTL_SECONDS,
 )
-from .utils import AzureOpenAILogger, AzureOpenAIValidator
+from .utils import APIVersionManager, AzureOpenAIValidator
 
 _LOGGER = logging.getLogger(__name__)
-_LOG = AzureOpenAILogger(__name__)
 
 DEFAULT_API_VERSION = "2025-03-01-preview"
 
@@ -95,9 +114,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self._step1_data: dict[str, Any] | None = None
 
     # --------------------------------------------------------------------- STEP 1
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Handle the initial step. Validates credentials and fetches capabilities."""
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
@@ -106,9 +123,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_API_KEY: user_input[CONF_API_KEY],
             CONF_API_BASE: user_input[CONF_API_BASE].strip(),
             CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),
-            CONF_API_VERSION: user_input.get(
-                CONF_API_VERSION, DEFAULT_API_VERSION
-            ).strip(),
+            CONF_API_VERSION: user_input.get(CONF_API_VERSION, DEFAULT_API_VERSION).strip(),
         }
 
         errors: dict[str, str] = {}
@@ -119,13 +134,11 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             self._step1_data[CONF_API_KEY],
             self._step1_data[CONF_API_BASE],
             self._step1_data[CONF_CHAT_MODEL],
-            _LOG,
+            _LOGGER,
         )
 
         try:
-            self._validated = await validator.validate(
-                self._step1_data[CONF_API_VERSION]
-            )
+            self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])
             self._sampling_caps = await validator.capabilities()
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.exception("Validation failed: %s", err)
@@ -241,6 +254,27 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             )
         ] = str
 
+        # Statistics: enable and file paths
+        cap_schema[vol.Optional(CONF_STATS_ENABLE, default=True)] = BooleanSelector()
+        cap_schema[
+            vol.Optional(
+                CONF_STATS_COMPONENT_LOG_PATH,
+                default=".storage/azure_openai_stats_component.log",
+            )
+        ] = str
+        cap_schema[
+            vol.Optional(
+                CONF_STATS_LLM_LOG_PATH,
+                default=".storage/azure_openai_stats_llm.log",
+            )
+        ] = str
+
+        # MCP Server
+        cap_schema[vol.Optional(CONF_MCP_ENABLED, default=RECOMMENDED_MCP_ENABLED)] = BooleanSelector()
+        cap_schema[vol.Optional(CONF_MCP_TTL_SECONDS, default=RECOMMENDED_MCP_TTL_SECONDS)] = NumberSelector(
+            NumberSelectorConfig(min=300, max=7200, step=300, mode="box")
+        )
+
         if not cap_schema:
             # nothing extra to ask
             return self._create_entry(options={})
@@ -341,6 +375,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             # utterances log defaults
             CONF_LOG_UTTERANCES: True,
             CONF_UTTERANCES_LOG_PATH: ".storage/azure_openai_conversation_utterances.log",
+            # MCP Server defaults
+            CONF_MCP_ENABLED: RECOMMENDED_MCP_ENABLED,
+            CONF_MCP_TTL_SECONDS: RECOMMENDED_MCP_TTL_SECONDS,
         }
         base_opts.update(options)
 

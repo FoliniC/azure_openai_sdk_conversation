@@ -71,6 +71,11 @@ CONF_SYNONYMS_FILE: Final[str] = "synonyms_file"
 CONF_LOG_UTTERANCES: Final[str] = "log_utterances"
 CONF_UTTERANCES_LOG_PATH: Final[str] = "utterances_log_path"
 
+# Statistics logging
+CONF_STATS_ENABLE: Final[str] = "stats_enable"
+CONF_STATS_COMPONENT_LOG_PATH: Final[str] = "stats_component_log_path"
+CONF_STATS_LLM_LOG_PATH: Final[str] = "stats_llm_log_path"
+
 # Backward compatibility: legacy keys/aliases
 CONF_EARLY_TIMEOUT_SECONDS: Final[str] = (
     "early_timeout_seconds"  # legacy alias for early wait seconds
@@ -121,8 +126,65 @@ RECOMMENDED_EARLY_WAIT_ENABLE: Final[bool] = True
 RECOMMENDED_EARLY_WAIT_SECONDS: Final[int] = 5
 RECOMMENDED_VOCABULARY_ENABLE: Final[bool] = True
 
+# Statistics Override
+CONF_STATS_OVERRIDE_MODE: Final[str] = "stats_override_mode"
+STATS_OVERRIDE_DEFAULT: Final[str] = "default"
+STATS_OVERRIDE_ENABLE: Final[str] = "enable"
+STATS_OVERRIDE_DISABLE: Final[str] = "disable"
+RECOMMENDED_STATS_OVERRIDE_MODE: Final[str] = STATS_OVERRIDE_DEFAULT
+
+
+# Statistics
+RECOMMENDED_STATS_ENABLE: Final[bool] = True
+RECOMMENDED_STATS_COMPONENT_LOG_PATH: Final[str] = (
+    ".storage/azure_openai_stats_component.log"
+)
+RECOMMENDED_STATS_LLM_LOG_PATH: Final[str] = ".storage/azure_openai_stats_llm.log"
+
 # Backward compatibility: legacy alias for recommended early timeout
 RECOMMENDED_EARLY_TIMEOUT_SECONDS: Final[int] = RECOMMENDED_EARLY_WAIT_SECONDS
+
+CONF_MCP_ENABLED: Final[str] = "mcp_enabled"
+CONF_MCP_TTL_SECONDS: Final[str] = "mcp_ttl_seconds"
+RECOMMENDED_MCP_ENABLED: Final[bool] = True
+RECOMMENDED_MCP_TTL_SECONDS: Final[int] = 3600
+
+# Advanced Statistics Configuration
+CONF_STATS_ENABLE: Final[str] = "stats_enable"
+CONF_STATS_AGGREGATED_FILE: Final[str] = "stats_aggregated_file"
+CONF_STATS_AGGREGATION_INTERVAL: Final[str] = "stats_aggregation_interval_minutes"
+
+# Token counting mode
+CONF_TOKEN_COUNTING_MODE: Final[str] = "token_counting_mode"
+TOKEN_COUNTING_SSE: Final[str] = "sse"  # Extract from SSE usage field
+TOKEN_COUNTING_ESTIMATE: Final[str] = "estimate"  # Estimate from text length
+TOKEN_COUNTING_HYBRID: Final[str] = "hybrid"  # Try SSE, fallback to estimate
+
+# Statistics defaults
+RECOMMENDED_STATS_ENABLE: Final[bool] = True
+RECOMMENDED_STATS_AGGREGATED_FILE: Final[str] = ".storage/azure_openai_stats_aggregated.json"
+RECOMMENDED_STATS_AGGREGATION_INTERVAL: Final[int] = 60  # minutes
+RECOMMENDED_TOKEN_COUNTING_MODE: Final[str] = TOKEN_COUNTING_HYBRID
+
+# Pricing configuration (USD per token)
+CONF_CUSTOM_PRICING: Final[str] = "custom_pricing"  # JSON string with model pricing
+
+# Alert thresholds
+CONF_ALERT_ERROR_RATE: Final[str] = "alert_error_rate_percentage"
+CONF_ALERT_COST_DAILY: Final[str] = "alert_cost_daily_usd"
+CONF_ALERT_AVG_TIME: Final[str] = "alert_avg_execution_time_ms"
+
+RECOMMENDED_ALERT_ERROR_RATE: Final[float] = 5.0  # 5% error rate triggers alert
+RECOMMENDED_ALERT_COST_DAILY: Final[float] = 5.0  # $5/day threshold
+RECOMMENDED_ALERT_AVG_TIME: Final[float] = 3000.0  # 3 seconds average
+
+# Export formats
+CONF_STATS_EXPORT_FORMAT: Final[str] = "stats_export_format"
+EXPORT_FORMAT_JSON: Final[str] = "json"
+EXPORT_FORMAT_CSV: Final[str] = "csv"
+EXPORT_FORMAT_BOTH: Final[str] = "both"
+
+RECOMMENDED_STATS_EXPORT_FORMAT: Final[str] = EXPORT_FORMAT_JSON
 
 __all__ = [
     # Domain / platforms
@@ -168,6 +230,10 @@ __all__ = [
     "CONF_SYNONYMS_FILE",
     "CONF_LOG_UTTERANCES",
     "CONF_UTTERANCES_LOG_PATH",
+    # Statistics
+    "CONF_STATS_ENABLE",
+    "CONF_STATS_COMPONENT_LOG_PATH",
+    "CONF_STATS_LLM_LOG_PATH",
     # Backward compatibility (alias)
     "CONF_EARLY_TIMEOUT_SECONDS",
     "RECOMMENDED_EARLY_TIMEOUT_SECONDS",
@@ -198,4 +264,37 @@ __all__ = [
     "RECOMMENDED_EARLY_WAIT_ENABLE",
     "RECOMMENDED_EARLY_WAIT_SECONDS",
     "RECOMMENDED_VOCABULARY_ENABLE",
+    "CONF_MCP_ENABLED",
+    "CONF_MCP_TTL_SECONDS",
+    "RECOMMENDED_MCP_ENABLED",
+    "RECOMMENDED_MCP_TTL_SECONDS",
+    # Statistics
+    "CONF_STATS_ENABLE",
+    "CONF_STATS_AGGREGATED_FILE",
+    "CONF_STATS_AGGREGATION_INTERVAL",
+    "CONF_TOKEN_COUNTING_MODE",
+    "TOKEN_COUNTING_SSE",
+    "TOKEN_COUNTING_ESTIMATE",
+    "TOKEN_COUNTING_HYBRID",
+    "RECOMMENDED_STATS_ENABLE",
+    "RECOMMENDED_STATS_AGGREGATED_FILE",
+    "RECOMMENDED_STATS_AGGREGATION_INTERVAL",
+    "RECOMMENDED_TOKEN_COUNTING_MODE",
+    
+    # Alerts
+    "CONF_ALERT_ERROR_RATE",
+    "CONF_ALERT_COST_DAILY",
+    "CONF_ALERT_AVG_TIME",
+    "RECOMMENDED_ALERT_ERROR_RATE",
+    "RECOMMENDED_ALERT_COST_DAILY",
+    "RECOMMENDED_ALERT_AVG_TIME",
+    
+    # Export
+    "CONF_STATS_EXPORT_FORMAT",
+    "EXPORT_FORMAT_JSON",
+    "EXPORT_FORMAT_CSV",
+    "EXPORT_FORMAT_BOTH",
+    "RECOMMENDED_STATS_EXPORT_FORMAT",
+    
+    "CONF_CUSTOM_PRICING",
 ]
