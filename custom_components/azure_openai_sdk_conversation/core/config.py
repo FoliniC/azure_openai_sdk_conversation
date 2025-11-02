@@ -25,15 +25,16 @@ from ..const import (
     CONF_STATS_AGGREGATION_INTERVAL,
 )
 
+
 @dataclass
 class AgentConfig:
     """
     Configuration for the conversation agent.
-    
+
     This class provides type-safe access to all configuration values,
     with sensible defaults and validation.
     """
-    
+
     # Core settings
     hass: HomeAssistant
 
@@ -42,23 +43,23 @@ class AgentConfig:
     api_base: str
     chat_model: str
     api_version: str
-    
+
     # Model parameters
     temperature: float = 0.7
     top_p: float = 1.0
     max_tokens: int = 512
     api_timeout: int = 30
     reasoning_effort: str = "medium"
-    
+
     # System prompt
     system_prompt: str = "You are a helpful assistant for Home Assistant."
-    
+
     # Token parameter (max_tokens | max_completion_tokens | max_output_tokens)
     token_param: str = "max_tokens"
-    
+
     # Responses API mode (auto | chat | responses)
     force_responses_mode: str = "auto"
-    
+
     # Logging
     log_level: str = "error"
     log_payload_request: bool = False
@@ -68,58 +69,59 @@ class AgentConfig:
     log_max_sse_lines: int = 10
     debug_sse: bool = False
     debug_sse_lines: int = 10
-    
+
     # Early wait / timeout
     early_wait_enable: bool = True
     early_wait_seconds: int = 5
-    
+
     # Vocabulary / text normalization
     vocabulary_enable: bool = True
     synonyms_file: Optional[str] = None
-    
+
     # Local intent handling
     local_intent_enable: bool = True
-    
+
     # Utterances logging
     log_utterances: bool = True
     utterances_log_path: str = ".storage/azure_openai_conversation_utterances.log"
-    
+
     # Statistics
     stats_enable: bool = False
     stats_aggregated_file: str = ".storage/azure_openai_stats_aggregated.json"
     stats_aggregation_interval: int = 60  # minutes
-    
+
     # MCP Server
     mcp_enabled: bool = True
     mcp_ttl_seconds: int = 3600
-    
+
     # Web search
     web_search_enable: bool = False
     bing_api_key: Optional[str] = None
     bing_endpoint: str = "https://api.bing.microsoft.com/v7.0/search"
     bing_max_results: int = 5
     web_search_context_size: int = 2000
-    
+
     # Entity exposure
     exposed_entities_limit: int = 500
-    
+
     @classmethod
     def from_dict(cls, hass: HomeAssistant, data: dict[str, Any]) -> AgentConfig:
         """
         Create configuration from dictionary (config entry data + options).
-        
+
         Args:
             hass: Home Assistant instance
             data: Combined data from config_entry.data and config_entry.options
-            
+
         Returns:
             AgentConfig instance with all settings
         """
+
         # Helper to safely get values with defaults
         def get_str(key: str, default: str) -> str:
             val = data.get(key)
             return str(val).strip() if val else default
-        
+
         def get_int(key: str, default: int) -> int:
             val = data.get(key)
             if isinstance(val, bool):
@@ -132,7 +134,7 @@ class AgentConfig:
                 except (ValueError, AttributeError):
                     return default
             return default
-        
+
         def get_float(key: str, default: float) -> float:
             val = data.get(key)
             if isinstance(val, bool):
@@ -145,7 +147,7 @@ class AgentConfig:
                 except (ValueError, AttributeError):
                     return default
             return default
-        
+
         def get_bool(key: str, default: bool) -> bool:
             val = data.get(key)
             if isinstance(val, bool):
@@ -159,39 +161,37 @@ class AgentConfig:
                 if v in ("0", "false", "off", "no", "n"):
                     return False
             return default
-        
+
         def resolve_path(path: Optional[str], default: str) -> str:
             """Resolve a path relative to HA config directory."""
             if not path:
                 return hass.config.path(default)
-            
+
             p = str(path).strip()
             if not os.path.isabs(p):
                 p = hass.config.path(p)
-            
+
             # If it's a directory, append default filename
             try:
                 is_dir = os.path.isdir(p)
             except Exception:
                 is_dir = False
-            
+
             if is_dir or p.endswith(("/", "\\")):
                 return os.path.join(p, os.path.basename(default))
-            
+
             return p
 
         # --- Statistics ---
         def _get_stats_enable() -> bool:
-            override_mode = get_str(
-                CONF_STATS_OVERRIDE_MODE, STATS_OVERRIDE_DEFAULT
-            )
+            override_mode = get_str(CONF_STATS_OVERRIDE_MODE, STATS_OVERRIDE_DEFAULT)
             if override_mode == STATS_OVERRIDE_ENABLE:
                 return True
             if override_mode == STATS_OVERRIDE_DISABLE:
                 return False
-            
+
             # Default mode: use global config
-            global_config = hass.data.get(DOMAIN, {}).get('global_config', {})
+            global_config = hass.data.get(DOMAIN, {}).get("global_config", {})
             return global_config.get(CONF_STATS_ENABLE, False)
 
         return cls(
@@ -201,23 +201,20 @@ class AgentConfig:
             api_base=get_str("api_base", "").rstrip("/"),
             chat_model=get_str("chat_model", "gpt-4o-mini"),
             api_version=get_str("api_version", "2025-03-01-preview"),
-            
             # Model parameters
             temperature=get_float("temperature", 0.7),
             top_p=get_float("top_p", 1.0),
             max_tokens=get_int("max_tokens", 512),
             api_timeout=get_int("api_timeout", 30),
             reasoning_effort=get_str("reasoning_effort", "medium"),
-            
             # System prompt
-            system_prompt=get_str("system_prompt", get_str("prompt", "You are a helpful assistant.")),
-            
+            system_prompt=get_str(
+                "system_prompt", get_str("prompt", "You are a helpful assistant.")
+            ),
             # Token parameter
             token_param=get_str("token_param", "max_tokens"),
-            
             # Mode
             force_responses_mode=get_str("force_responses_mode", "auto"),
-            
             # Logging
             log_level=get_str("log_level", "error"),
             log_payload_request=get_bool("log_payload_request", False),
@@ -227,25 +224,20 @@ class AgentConfig:
             log_max_sse_lines=get_int("log_max_sse_lines", 10),
             debug_sse=get_bool("debug_sse", False),
             debug_sse_lines=get_int("debug_sse_lines", 10),
-            
             # Early wait
             early_wait_enable=get_bool("early_wait_enable", True),
             early_wait_seconds=get_int("early_wait_seconds", 5),
-            
             # Vocabulary
             vocabulary_enable=get_bool("vocabulary_enable", True),
             synonyms_file=data.get("synonyms_file"),
-            
             # Local intent
             local_intent_enable=get_bool("local_intent_enable", True),
-            
             # Utterances
             log_utterances=get_bool("log_utterances", True),
             utterances_log_path=resolve_path(
                 data.get("utterances_log_path"),
                 ".storage/azure_openai_conversation_utterances.log",
             ),
-            
             # Statistics
             stats_enable=_get_stats_enable(),
             stats_aggregated_file=resolve_path(
@@ -253,13 +245,13 @@ class AgentConfig:
                 ".storage/azure_openai_stats_aggregated.json",
             ),
             stats_aggregation_interval=get_int(CONF_STATS_AGGREGATION_INTERVAL, 60),
-            
             # MCP
             mcp_enabled=get_bool("mcp_enabled", True),
             mcp_ttl_seconds=get_int("mcp_ttl_seconds", 3600),
-            
             # Web search
-            web_search_enable=get_bool("web_search", get_bool("enable_web_search", False)),
+            web_search_enable=get_bool(
+                "web_search", get_bool("enable_web_search", False)
+            ),
             bing_api_key=data.get("bing_api_key"),
             bing_endpoint=get_str(
                 "bing_endpoint",
@@ -267,11 +259,10 @@ class AgentConfig:
             ),
             bing_max_results=get_int("bing_max_results", 5),
             web_search_context_size=get_int("web_search_context_size", 2000),
-            
             # Entity limits
             exposed_entities_limit=get_int("exposed_entities_limit", 500),
         )
-    
+
     async def log_utterance(
         self,
         hass: HomeAssistant,
@@ -282,7 +273,7 @@ class AgentConfig:
     ) -> None:
         """
         Log an utterance to the configured file.
-        
+
         Args:
             hass: Home Assistant instance
             conversation_id: Conversation ID
@@ -292,7 +283,7 @@ class AgentConfig:
         """
         if not self.log_utterances or not self.utterances_log_path:
             return
-        
+
         line = json.dumps(
             {
                 "ts": datetime.now(timezone.utc).isoformat(),
@@ -303,57 +294,57 @@ class AgentConfig:
             },
             ensure_ascii=False,
         )
-        
+
         def _write():
             path = self.utterances_log_path
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(path, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
-        
+
         try:
             await hass.async_add_executor_job(_write)
         except Exception:
             # Silently ignore logging failures
             pass
-    
+
     def validate(self) -> list[str]:
         """
         Validate configuration and return list of errors.
-        
+
         Returns:
             List of error messages (empty if valid)
         """
         errors = []
-        
+
         if not self.api_key:
             errors.append("api_key is required")
-        
+
         if not self.api_base:
             errors.append("api_base is required")
-        
+
         if not self.chat_model:
             errors.append("chat_model is required")
-        
+
         if self.temperature < 0 or self.temperature > 2:
             errors.append(f"temperature must be in [0, 2], got {self.temperature}")
-        
+
         if self.top_p < 0 or self.top_p > 1:
             errors.append(f"top_p must be in [0, 1], got {self.top_p}")
-        
+
         if self.max_tokens < 1:
             errors.append(f"max_tokens must be > 0, got {self.max_tokens}")
-        
+
         if self.api_timeout < 5:
             errors.append(f"api_timeout must be >= 5, got {self.api_timeout}")
-        
+
         return errors
-    
+
     def to_dict(self) -> dict[str, Any]:
         """
         Convert configuration to dictionary.
-        
+
         Useful for logging and debugging.
-        
+
         Returns:
             Dictionary representation with sensitive data redacted
         """
@@ -363,13 +354,11 @@ class AgentConfig:
             "api_base": self.api_base,
             "chat_model": self.chat_model,
             "api_version": self.api_version,
-            
             # Model parameters
             "temperature": self.temperature,
             "top_p": self.top_p,
             "max_tokens": self.max_tokens,
             "api_timeout": self.api_timeout,
-            
             # Flags
             "vocabulary_enable": self.vocabulary_enable,
             "local_intent_enable": self.local_intent_enable,
@@ -378,9 +367,9 @@ class AgentConfig:
             "mcp_enabled": self.mcp_enabled,
             "web_search_enable": self.web_search_enable,
         }
-        
+
         return data
-    
+
     @staticmethod
     def _redact_key(key: str) -> str:
         """Redact API key for logging."""

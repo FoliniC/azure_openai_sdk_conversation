@@ -162,7 +162,9 @@ TOKEN_COUNTING_HYBRID: Final[str] = "hybrid"  # Try SSE, fallback to estimate
 
 # Statistics defaults
 RECOMMENDED_STATS_ENABLE: Final[bool] = True
-RECOMMENDED_STATS_AGGREGATED_FILE: Final[str] = ".storage/azure_openai_stats_aggregated.json"
+RECOMMENDED_STATS_AGGREGATED_FILE: Final[str] = (
+    ".storage/azure_openai_stats_aggregated.json"
+)
 RECOMMENDED_STATS_AGGREGATION_INTERVAL: Final[int] = 60  # minutes
 RECOMMENDED_TOKEN_COUNTING_MODE: Final[str] = TOKEN_COUNTING_HYBRID
 
@@ -280,7 +282,6 @@ __all__ = [
     "RECOMMENDED_STATS_AGGREGATED_FILE",
     "RECOMMENDED_STATS_AGGREGATION_INTERVAL",
     "RECOMMENDED_TOKEN_COUNTING_MODE",
-    
     # Alerts
     "CONF_ALERT_ERROR_RATE",
     "CONF_ALERT_COST_DAILY",
@@ -288,13 +289,11 @@ __all__ = [
     "RECOMMENDED_ALERT_ERROR_RATE",
     "RECOMMENDED_ALERT_COST_DAILY",
     "RECOMMENDED_ALERT_AVG_TIME",
-    
     # Export
     "CONF_STATS_EXPORT_FORMAT",
     "EXPORT_FORMAT_JSON",
     "EXPORT_FORMAT_CSV",
     "EXPORT_FORMAT_BOTH",
     "RECOMMENDED_STATS_EXPORT_FORMAT",
-    
     "CONF_CUSTOM_PRICING",
 ]

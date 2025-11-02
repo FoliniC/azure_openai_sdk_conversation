@@ -50,15 +50,15 @@ CONFIG_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the component from configuration.yaml."""
     hass.data.setdefault(DOMAIN, {})
-    
+
     # Store global config if present
     if DOMAIN in config:
-        hass.data[DOMAIN]['global_config'] = config[DOMAIN]
+        hass.data[DOMAIN]["global_config"] = config[DOMAIN]
         _LOGGER.info(
             "Azure OpenAI global config loaded: stats_enable=%s",
-            config[DOMAIN].get(CONF_STATS_ENABLE)
+            config[DOMAIN].get(CONF_STATS_ENABLE),
         )
-        
+
     return True
 
 

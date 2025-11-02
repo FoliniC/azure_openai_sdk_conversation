@@ -471,11 +471,15 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             {
                 vol.Optional(
                     CONF_MCP_ENABLED,
-                    default=self.config_entry.options.get(CONF_MCP_ENABLED, RECOMMENDED_MCP_ENABLED),
+                    default=self.config_entry.options.get(
+                        CONF_MCP_ENABLED, RECOMMENDED_MCP_ENABLED
+                    ),
                 ): BooleanSelector(),
                 vol.Optional(
                     CONF_MCP_TTL_SECONDS,
-                    default=self.config_entry.options.get(CONF_MCP_TTL_SECONDS, RECOMMENDED_MCP_TTL_SECONDS),
+                    default=self.config_entry.options.get(
+                        CONF_MCP_TTL_SECONDS, RECOMMENDED_MCP_TTL_SECONDS
+                    ),
                 ): NumberSelector(
                     NumberSelectorConfig(
                         min=300,

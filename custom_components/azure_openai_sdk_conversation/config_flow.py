@@ -104,7 +104,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         self._step1_data: dict[str, Any] | None = None
 
     # --------------------------------------------------------------------- STEP 1
-    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Handle the initial step. Validates credentials and fetches capabilities."""
         if user_input is None:
             return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
@@ -113,7 +115,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_API_KEY: user_input[CONF_API_KEY],
             CONF_API_BASE: user_input[CONF_API_BASE].strip(),
             CONF_CHAT_MODEL: user_input[CONF_CHAT_MODEL].strip(),
-            CONF_API_VERSION: user_input.get(CONF_API_VERSION, DEFAULT_API_VERSION).strip(),
+            CONF_API_VERSION: user_input.get(
+                CONF_API_VERSION, DEFAULT_API_VERSION
+            ).strip(),
         }
 
         errors: dict[str, str] = {}
@@ -128,7 +132,9 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
         try:
-            self._validated = await validator.validate(self._step1_data[CONF_API_VERSION])
+            self._validated = await validator.validate(
+                self._step1_data[CONF_API_VERSION]
+            )
             self._sampling_caps = await validator.capabilities()
         except Exception as err:  # pylint: disable=broad-except
             _LOGGER.exception("Validation failed: %s", err)
@@ -260,8 +266,12 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         ] = str
 
         # MCP Server
-        cap_schema[vol.Optional(CONF_MCP_ENABLED, default=RECOMMENDED_MCP_ENABLED)] = BooleanSelector()
-        cap_schema[vol.Optional(CONF_MCP_TTL_SECONDS, default=RECOMMENDED_MCP_TTL_SECONDS)] = NumberSelector(
+        cap_schema[vol.Optional(CONF_MCP_ENABLED, default=RECOMMENDED_MCP_ENABLED)] = (
+            BooleanSelector()
+        )
+        cap_schema[
+            vol.Optional(CONF_MCP_TTL_SECONDS, default=RECOMMENDED_MCP_TTL_SECONDS)
+        ] = NumberSelector(
             NumberSelectorConfig(min=300, max=7200, step=300, mode="box")
         )
 

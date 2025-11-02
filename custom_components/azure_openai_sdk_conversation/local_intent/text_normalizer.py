@@ -19,7 +19,7 @@ from ..core.logger import AgentLogger
 
 class TextNormalizer:
     """Text normalizer with configurable vocabulary."""
-    
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -28,7 +28,7 @@ class TextNormalizer:
     ) -> None:
         """
         Initialize text normalizer.
-        
+
         Args:
             hass: Home Assistant instance
             config: Agent configuration
@@ -37,20 +37,20 @@ class TextNormalizer:
         self._hass = hass
         self._config = config
         self._logger = logger
-        
+
         # Vocabulary data
         self._token_synonyms: dict[str, str] = {}
         self._regex_rules: list[tuple[re.Pattern, str]] = []
         self._loaded = False
-    
+
     async def ensure_loaded(self) -> None:
         """Load vocabulary if not already loaded."""
         if self._loaded:
             return
-        
+
         # Get default vocabulary
         vocab = self._get_default_vocabulary()
-        
+
         # Load custom synonyms file if configured
         if self._config.synonyms_file and os.path.isfile(self._config.synonyms_file):
             try:
@@ -59,7 +59,7 @@ class TextNormalizer:
                 )
                 # Merge with default
                 vocab = self._merge_vocabularies(vocab, custom_vocab)
-                
+
                 self._logger.info(
                     "Loaded custom synonyms from %s", self._config.synonyms_file
                 )
@@ -69,13 +69,13 @@ class TextNormalizer:
                     self._config.synonyms_file,
                     err,
                 )
-        
+
         # Build token synonyms map
         self._token_synonyms = {}
         for source, target in vocab.get("token_synonyms", {}).items():
             if isinstance(source, str) and isinstance(target, str):
                 self._token_synonyms[source.strip().lower()] = target.strip().lower()
-        
+
         # Compile regex rules
         self._regex_rules = []
         for rule in vocab.get("regex_rules", []):
@@ -91,33 +91,33 @@ class TextNormalizer:
                         pattern,
                         rex,
                     )
-        
+
         self._loaded = True
         self._logger.debug(
             "Vocabulary loaded: %d synonyms, %d regex rules",
             len(self._token_synonyms),
             len(self._regex_rules),
         )
-    
+
     def normalize(self, text: str) -> str:
         """
         Normalize text using vocabulary rules.
-        
+
         Args:
             text: Raw user input
-            
+
         Returns:
             Normalized text
         """
         if not text:
             return ""
-        
+
         s = text.strip()
-        
+
         # Apply regex rules first
         for pattern, replacement in self._regex_rules:
             s = pattern.sub(replacement, s)
-        
+
         # Apply token synonyms (full-phrase substitutions)
         # Process longer phrases first to avoid partial matches
         for source in sorted(self._token_synonyms.keys(), key=len, reverse=True):
@@ -133,23 +133,24 @@ class TextNormalizer:
             except re.error:
                 # Fallback to simple replace if regex fails
                 s = s.replace(source, target)
-        
+
         # Clean up multiple spaces
         s = re.sub(r"\s{2,}", " ", s).strip()
-        
+
         # Normalize to lowercase (preserving accents)
         s = s.lower()
-        
+
         return s
-    
+
     async def _load_synonyms_file(self, path: str) -> dict[str, Any]:
         """Load synonyms from JSON file."""
+
         def _read() -> dict[str, Any]:
             with open(path, "r", encoding="utf-8") as f:
                 return json.load(f)
-        
+
         return await self._hass.async_add_executor_job(_read)
-    
+
     @staticmethod
     def _get_default_vocabulary() -> dict[str, Any]:
         """Get default vocabulary specification."""
@@ -161,24 +162,19 @@ class TextNormalizer:
                 "spegnere": "spegni",
                 "spengi": "spegni",  # Common typo
                 "off": "spegni",
-                
                 "attiva": "accendi",
                 "attivare": "accendi",
                 "accendere": "accendi",
                 "on": "accendi",
-                
                 # Objects/Rooms (Italian)
                 "luci": "luce",
                 "lampada": "luce",
                 "lampadario": "luce",
                 "faretti": "luce",
                 "spot": "luce",
-                
                 "salotto": "soggiorno",
                 "sala": "soggiorno",
-                
                 "bagni": "bagno",
-                
                 # Common collocations
                 "luce tavolo": "tavolo",
                 "luci tavolo": "tavolo",
@@ -214,7 +210,7 @@ class TextNormalizer:
                 },
             ],
         }
-    
+
     @staticmethod
     def _merge_vocabularies(
         base: dict[str, Any],
@@ -222,26 +218,26 @@ class TextNormalizer:
     ) -> dict[str, Any]:
         """
         Merge two vocabulary specifications.
-        
+
         Custom rules are added to base rules (not replaced).
         """
         merged = {
             "token_synonyms": dict(base.get("token_synonyms", {})),
             "regex_rules": list(base.get("regex_rules", [])),
         }
-        
+
         # Merge token synonyms (custom overrides base)
         custom_synonyms = custom.get("token_synonyms", {})
         if isinstance(custom_synonyms, dict):
             merged["token_synonyms"].update(custom_synonyms)
-        
+
         # Append regex rules
         custom_rules = custom.get("regex_rules", [])
         if isinstance(custom_rules, list):
             merged["regex_rules"].extend(custom_rules)
-        
+
         return merged
-    
+
     async def close(self) -> None:
         """Clean up resources."""
         pass

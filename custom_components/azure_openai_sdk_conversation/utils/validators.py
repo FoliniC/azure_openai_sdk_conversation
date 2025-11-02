@@ -15,7 +15,7 @@ from .api_version import APIVersionManager
 
 class AzureOpenAIValidator:
     """Validator for Azure OpenAI credentials and configuration."""
-    
+
     def __init__(
         self,
         hass: HomeAssistant,
@@ -25,7 +25,7 @@ class AzureOpenAIValidator:
     ) -> None:
         """
         Initialize validator.
-        
+
         Args:
             hass: Home Assistant instance
             api_key: Azure OpenAI API key
@@ -36,31 +36,31 @@ class AzureOpenAIValidator:
         self._api_key = api_key
         self._api_base = api_base.rstrip("/")
         self._model = model
-    
+
     async def validate(self, api_version: str | None = None) -> dict[str, Any]:
         """
         Validate credentials by calling /openai/models endpoint.
-        
+
         Args:
             api_version: API version to use (optional)
-            
+
         Returns:
             Dict with validated settings
-            
+
         Raises:
             Exception if validation fails
         """
         # Determine API version
         if not api_version:
             api_version = APIVersionManager.best_for_model(self._model)
-        
+
         # Build request
         url = f"{self._api_base}/openai/models"
         headers = {
             "api-key": self._api_key,
             "Accept": "application/json",
         }
-        
+
         # Execute request
         http = get_async_client(self._hass)
         try:
@@ -72,18 +72,20 @@ class AzureOpenAIValidator:
             )
         except Exception as err:
             raise Exception(f"Connection failed: {err}") from err
-        
+
         # Check response
         if resp.status_code == 401 or resp.status_code == 403:
             raise Exception("Invalid API key (unauthorized)")
-        
+
         if resp.status_code == 404:
             raise Exception("Deployment not found or invalid endpoint")
-        
+
         if resp.status_code >= 400:
             body = await resp.aread()
-            raise Exception(f"HTTP {resp.status_code}: {body.decode('utf-8', 'ignore')}")
-        
+            raise Exception(
+                f"HTTP {resp.status_code}: {body.decode('utf-8', 'ignore')}"
+            )
+
         # Determine token parameter
         model_lower = self._model.lower()
         if model_lower.startswith("o"):
@@ -100,16 +102,16 @@ class AzureOpenAIValidator:
                     token_param = "max_tokens"
             except (ValueError, IndexError):
                 token_param = "max_tokens"
-        
+
         return {
             "api_version": api_version,
             "token_param": token_param,
         }
-    
+
     async def capabilities(self) -> dict[str, dict[str, Any]]:
         """
         Get model capabilities metadata.
-        
+
         Returns:
             Dict of parameter name -> metadata
         """
