@@ -7,7 +7,7 @@ Provides both exact counting (from API usage field) and estimation
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 
 class TokenCounter:

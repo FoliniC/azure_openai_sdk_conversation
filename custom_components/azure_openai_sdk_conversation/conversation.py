@@ -11,10 +11,8 @@ import logging
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CONF_API_KEY
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
-from homeassistant.helpers.typing import ConfigType
 from homeassistant.components import conversation
 
 from .core.agent import AzureOpenAIConversationAgent

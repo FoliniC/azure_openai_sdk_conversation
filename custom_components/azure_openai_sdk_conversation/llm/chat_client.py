@@ -11,7 +11,6 @@ Handles:
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Any, Optional, Callable
 
 from homeassistant.core import HomeAssistant
@@ -150,7 +149,7 @@ class ChatClient:
             if attempt_key in attempted:
                 # Already tried this combination, give up
                 raise RuntimeError(
-                    f"Failed to complete chat after trying all parameter combinations"
+                    "Failed to complete chat after trying all parameter combinations"
                 )
             attempted.add(attempt_key)
             

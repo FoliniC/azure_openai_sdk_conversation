@@ -1,4 +1,9 @@
 # CHANGELOG – Azure OpenAI SDK Conversation  
+## 0.5.1 - November 2025
+
+### Housekeeping
+- **Linting**: Fixed various linting errors reported by `ruff`, including undefined names, unused variables, and incorrect import locations.
+
 ## 0.5.0 - November 2025
 
 ### Features

@@ -26,11 +26,6 @@ from homeassistant.components.persistent_notification import async_create
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import intent as intent_helper
 
-from ..const import (
-    CONF_EARLY_WAIT_ENABLE,
-    CONF_EARLY_WAIT_SECONDS,
-    CONF_STATS_ENABLE,
-)
 from ..llm.chat_client import ChatClient
 from ..llm.responses_client import ResponsesClient
 from ..local_intent.local_handler import LocalIntentHandler
@@ -145,7 +140,6 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         """
         # Start timing
         start_time = time.perf_counter()
-        first_chunk_time: Optional[float] = None
         
         # Initialize metrics
         conv_id = user_input.conversation_id

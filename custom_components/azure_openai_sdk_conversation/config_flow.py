@@ -15,7 +15,6 @@ from homeassistant.config_entries import (
     OptionsFlow,
 )
 from homeassistant.const import CONF_API_KEY
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers import llm
 from homeassistant.helpers.httpx_client import get_async_client  # noqa: F401
 from homeassistant.helpers.selector import (
@@ -25,7 +24,6 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
-    TemplateSelector,
 )
 from homeassistant.helpers.typing import VolDictType
 
@@ -36,23 +34,11 @@ from .const import (
     CONF_CHAT_MODEL,
     CONF_MAX_TOKENS,
     CONF_PROMPT,
-    CONF_REASONING_EFFORT,
     CONF_RECOMMENDED,
-    CONF_TEMPERATURE,
-    CONF_TOP_P,
-    CONF_WEB_SEARCH,
-    CONF_WEB_SEARCH_CONTEXT_SIZE,
-    CONF_WEB_SEARCH_USER_LOCATION,
     CONF_EXPOSED_ENTITIES_LIMIT,
     DOMAIN,
     RECOMMENDED_CHAT_MODEL,
     RECOMMENDED_MAX_TOKENS,
-    RECOMMENDED_REASONING_EFFORT,
-    RECOMMENDED_TEMPERATURE,
-    RECOMMENDED_TOP_P,
-    RECOMMENDED_WEB_SEARCH,
-    RECOMMENDED_WEB_SEARCH_CONTEXT_SIZE,
-    RECOMMENDED_WEB_SEARCH_USER_LOCATION,
     RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
     # logging
     CONF_LOG_LEVEL,
@@ -83,8 +69,12 @@ from .const import (
     CONF_MCP_TTL_SECONDS,
     RECOMMENDED_MCP_ENABLED,
     RECOMMENDED_MCP_TTL_SECONDS,
+    # Statistics
+    CONF_STATS_ENABLE,
+    CONF_STATS_COMPONENT_LOG_PATH,
+    CONF_STATS_LLM_LOG_PATH,
 )
-from .utils import APIVersionManager, AzureOpenAIValidator
+from .utils import AzureOpenAIValidator
 
 _LOGGER = logging.getLogger(__name__)
 

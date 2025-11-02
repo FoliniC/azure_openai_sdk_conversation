@@ -6,11 +6,10 @@ lo stato e invia solo le entità che hanno cambiato stato.
 
 from __future__ import annotations
 import asyncio
-import json
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, Set
-from dataclasses import dataclass, asdict
+from typing import Any, Dict
+from dataclasses import dataclass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -369,7 +368,6 @@ def patch_conversation_agent(agent: Any, hass: Any) -> Any:
     asyncio.create_task(mcp_server.start())
     
     # Salva il metodo originale
-    original_render = agent._render_system_message
     ############
     def _mcp_prepare_system_message(self, *args, **kwargs):  
         """Normalize MCP prepare_system_message return types across versions.  

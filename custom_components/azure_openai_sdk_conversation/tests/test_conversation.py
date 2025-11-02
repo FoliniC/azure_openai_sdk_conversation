@@ -1,11 +1,8 @@
+from __future__ import annotations
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-
-pytest_plugins = "pytest_homeassistant_custom_component"
-
+from unittest.mock import MagicMock
 
 from homeassistant.core import HomeAssistant
-from homeassistant.config_entries import ConfigEntry
 
 from custom_components.azure_openai_sdk_conversation.conversation import AzureOpenAIConversationAgent
 from custom_components.azure_openai_sdk_conversation.const import (
@@ -13,6 +10,9 @@ from custom_components.azure_openai_sdk_conversation.const import (
     CONF_SYNONYMS_FILE,
     CONF_LOCAL_INTENT_ENABLE,
 )
+
+pytest_plugins = "pytest_homeassistant_custom_component"
+
 
 # Basic config entry data
 MOCK_CONFIG_DATA = {
