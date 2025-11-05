@@ -66,6 +66,8 @@ from .const import (
     RECOMMENDED_EARLY_WAIT_ENABLE,
     RECOMMENDED_EARLY_WAIT_SECONDS,
     RECOMMENDED_VOCABULARY_ENABLE,
+    CONF_LOCAL_INTENT_ENABLE,
+    RECOMMENDED_LOCAL_INTENT_ENABLE,
     # MCP Server
     CONF_MCP_ENABLED,
     CONF_MCP_TTL_SECONDS,
@@ -81,6 +83,18 @@ from .const import (
     RECOMMENDED_STATS_AGGREGATED_FILE,
     CONF_STATS_AGGREGATION_INTERVAL,
     RECOMMENDED_STATS_AGGREGATION_INTERVAL,
+    CONF_TOOLS_ENABLE,
+    CONF_TOOLS_WHITELIST,
+    CONF_TOOLS_MAX_ITERATIONS,
+    CONF_TOOLS_MAX_CALLS_PER_MINUTE,
+    CONF_TOOLS_PARALLEL_EXECUTION,
+    RECOMMENDED_TOOLS_ENABLE,
+    RECOMMENDED_TOOLS_WHITELIST,
+    RECOMMENDED_TOOLS_MAX_ITERATIONS,
+    RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
+    RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
+    CONF_SSL_VERIFY,
+    CONF_PAYLOAD_LOG_PATH,
 )
 from .utils import APIVersionManager
 
@@ -212,6 +226,10 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         mode="slider",
                     )
                 ),
+                vol.Optional(
+                    CONF_SSL_VERIFY,
+                    default=self.config_entry.options.get(CONF_SSL_VERIFY, True),
+                ): BooleanSelector(),
             }
         )
 
@@ -359,6 +377,13 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         mode="box",
                     )
                 ),
+                vol.Optional(
+                    CONF_PAYLOAD_LOG_PATH,
+                    default=self.config_entry.options.get(
+                        CONF_PAYLOAD_LOG_PATH,
+                        ".storage/azure_openai_payloads.log",
+                    ),
+                ): str,
             }
         )
 
@@ -420,6 +445,18 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                         ".storage/azure_openai_conversation_utterances.log",
                     ),
                 ): str,
+            }
+        )
+
+        # Local Intent Handling
+        schema = schema.extend(
+            {
+                vol.Optional(
+                    CONF_LOCAL_INTENT_ENABLE,
+                    default=self.config_entry.options.get(
+                        CONF_LOCAL_INTENT_ENABLE, RECOMMENDED_LOCAL_INTENT_ENABLE
+                    ),
+                ): BooleanSelector(),
             }
         )
 
@@ -490,6 +527,65 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ),
             }
         )
+
+        # Tool Calling section
+        schema = schema.extend(
+            {
+                vol.Optional(
+                    CONF_TOOLS_ENABLE,
+                    default=self.config_entry.options.get(
+                        CONF_TOOLS_ENABLE, RECOMMENDED_TOOLS_ENABLE
+                    ),
+                ): BooleanSelector(),
+            }
+        )
+
+        # Only show additional tool settings if tools are enabled
+        if self.config_entry.options.get(CONF_TOOLS_ENABLE, RECOMMENDED_TOOLS_ENABLE):
+            schema = schema.extend(
+                {
+                    vol.Optional(
+                        CONF_TOOLS_WHITELIST,
+                        default=self.config_entry.options.get(
+                            CONF_TOOLS_WHITELIST, RECOMMENDED_TOOLS_WHITELIST
+                        ),
+                    ): str,
+                    vol.Optional(
+                        CONF_TOOLS_MAX_ITERATIONS,
+                        default=self.config_entry.options.get(
+                            CONF_TOOLS_MAX_ITERATIONS, RECOMMENDED_TOOLS_MAX_ITERATIONS
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1,
+                            max=20,
+                            step=1,
+                            mode="box",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_TOOLS_MAX_CALLS_PER_MINUTE,
+                        default=self.config_entry.options.get(
+                            CONF_TOOLS_MAX_CALLS_PER_MINUTE,
+                            RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=5,
+                            max=100,
+                            step=5,
+                            mode="box",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_TOOLS_PARALLEL_EXECUTION,
+                        default=self.config_entry.options.get(
+                            CONF_TOOLS_PARALLEL_EXECUTION,
+                            RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
+                        ),
+                    ): BooleanSelector(),
+                }
+            )
 
         return self.async_show_form(step_id="init", data_schema=schema)
 

@@ -34,6 +34,7 @@ from ..stats.manager import StatsManager
 from ..stats.metrics import RequestMetrics
 from .config import AgentConfig
 from .logger import AgentLogger
+from ..tools import ToolManager
 
 
 class AzureOpenAIConversationAgent(AbstractConversationAgent):
@@ -50,7 +51,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         super().__init__()
         self._hass = hass
         self._config = config
-        self._logger = AgentLogger(config)
+        self._logger = AgentLogger(hass, config)
 
         # Initialize LLM clients
         self._chat_client: Optional[ChatClient] = None
@@ -71,6 +72,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             logger=self._logger,
         )
 
+        # Initialize Tool Manager
+        self._tool_manager: Optional[ToolManager] = None
+        if config.tools_enable:
+            self._tool_manager = ToolManager(
+                hass=hass,
+                config=config,
+                logger=self._logger,
+            )
+
         # Initialize statistics manager
         self._stats_manager: Optional[StatsManager] = None
         if config.stats_enable:
@@ -85,10 +95,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         self._pending_requests: dict[str, dict[str, Any]] = {}
 
         self._logger.info(
-            "Agent initialized: model=%s, local_intent=%s, stats=%s",
+            "Agent initialized: model=%s, local_intent=%s, stats=%s, tools=%s",
             config.chat_model,
             config.local_intent_enable,
             config.stats_enable,
+            config.tools_enable,
         )
 
     def _init_llm_clients(self) -> None:
@@ -138,6 +149,48 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         Returns:
             ConversationResult with response
         """
+        # Try to process with the default HA agent first
+        agent_manager = conversation.get_agent_manager(self._hass)
+        try:
+            # Try to get the built-in Home Assistant agent
+            default_agent = await agent_manager.async_get_agent("homeassistant")
+        except ValueError:
+            # This can happen if the default agent is disabled.
+            self._logger.debug("Default 'homeassistant' agent not found, skipping.")
+            default_agent = None
+
+        if default_agent and default_agent.agent_id != self.agent_id:
+            self._logger.debug("Attempting to process with default HA agent")
+            delegated_start_time = time.perf_counter()
+            try:
+                result = await default_agent.async_process(user_input)
+                if not (
+                    result.response.response_type == conversation.ResponseType.ERROR
+                    and result.response.error_code == "no_intent_match"
+                ):
+                    # The delegated agent handled it (or failed with something other than "no_intent_match")
+                    self._logger.debug("Default HA agent handled the request")
+                    execution_time_ms = (
+                        time.perf_counter() - delegated_start_time
+                    ) * 1000
+
+                    response_text = ""
+                    if result.response.speech:
+                        response_text = result.response.speech.get("plain", {}).get(
+                            "speech", ""
+                        )
+
+                    await self._logger.log_delegated_action(
+                        conversation_id=user_input.conversation_id,
+                        user_message=user_input.text,
+                        agent_name="homeassistant",
+                        response=response_text,
+                        execution_time_ms=execution_time_ms,
+                    )
+                    return result
+            except Exception as e:
+                self._logger.warning("Default HA agent failed: %s", e)
+
         # Start timing
         start_time = time.perf_counter()
 
@@ -158,7 +211,9 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
 
         try:
             self._logger.debug(
-                "Processing request: conv_id=%s, text=%s", conv_id, text_raw[:50]
+                "Processing request with Azure OpenAI: conv_id=%s, text=%s",
+                conv_id,
+                text_raw[:50],
             )
 
             # Check for pending continuation
@@ -227,7 +282,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             ConversationResult if handled locally, None otherwise
         """
         intent_result = await self._local_handler.try_handle(
-            normalized_text, user_input
+            normalized_text, user_input, start_time
         )
 
         if intent_result:
@@ -315,31 +370,48 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 first_chunk_tracked = True
                 metrics.first_chunk_time_ms = (time.perf_counter() - start_time) * 1000
 
-        # Execute LLM call with early timeout if enabled
-        if self._config.early_wait_enable and self._config.early_wait_seconds > 0:
-            result = await self._execute_with_early_timeout(
-                client=client,
-                messages=messages,
-                conv_id=conv_id,
-                language=language,
-                metrics=metrics,
-                track_callback=track_first_chunk,
-            )
-        else:
-            # Execute directly
-            text_out, token_counts = await client.complete(
-                messages=messages,
+        # Use ToolManager if enabled
+        if self._config.tools_enable and self._tool_manager:
+            tool_loop_result = await self._tool_manager.process_tool_loop(
+                initial_messages=messages,
+                llm_client=client,
+                max_iterations=self._config.tools_max_iterations,
                 conversation_id=conv_id,
+                user_message=normalized_text,
                 track_callback=track_first_chunk,
             )
-            # result = self._create_result(user_input, text_out)
+            text_out = tool_loop_result.get("text", "")
             result = self._create_result(
                 conversation_id=conv_id, language=language, text=text_out
             )
-            # Update metrics
-            metrics.prompt_tokens = token_counts.get("prompt", 0)
-            metrics.completion_tokens = token_counts.get("completion", 0)
-            metrics.total_tokens = token_counts.get("total", 0)
+            # TODO: Handle token counts from tool loop
+        else:
+            # Execute LLM call with early timeout if enabled
+            if self._config.early_wait_enable and self._config.early_wait_seconds > 0:
+                result = await self._execute_with_early_timeout(
+                    client=client,
+                    messages=messages,
+                    conv_id=conv_id,
+                    language=language,
+                    metrics=metrics,
+                    track_callback=track_first_chunk,
+                    normalized_text=normalized_text,
+                )
+            else:
+                # Execute directly
+                text_out, token_counts = await client.complete(
+                    messages=messages,
+                    conversation_id=conv_id,
+                    user_message=normalized_text,
+                    track_callback=track_first_chunk,
+                )
+                result = self._create_result(
+                    conversation_id=conv_id, language=language, text=text_out
+                )
+                # Update metrics
+                metrics.prompt_tokens = token_counts.get("prompt", 0)
+                metrics.completion_tokens = token_counts.get("completion", 0)
+                metrics.total_tokens = token_counts.get("total", 0)
 
         # Finalize metrics
         metrics.execution_time_ms = (time.perf_counter() - start_time) * 1000
@@ -358,6 +430,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         language: Optional[str],
         metrics: RequestMetrics,
         track_callback: callable,
+        normalized_text: str,
     ) -> ConversationResult:
         """
         Execute LLM call with early timeout handling.
@@ -372,6 +445,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             client.complete(
                 messages=messages,
                 conversation_id=conv_id,
+                user_message=normalized_text,
                 first_chunk_event=first_chunk_event,
                 track_callback=track_callback,
             )

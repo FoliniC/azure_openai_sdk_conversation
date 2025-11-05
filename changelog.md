@@ -1,4 +1,213 @@
-# CHANGELOG – Azure OpenAI SDK Conversation  
+# CHANGELOG – Azure OpenAI SDK Conversation
+
+## 1.0.2 - 2025-11-05
+
+### Features
+- **Local Intent Handling Toggle**: Added a new configuration option (`local_intent_enable`) to allow users to enable or disable direct handling of simple intents (e.g., turning lights on/off) without calling the LLM.
+- **Configuration UI Clarity**: Added descriptive help text for numerous configuration options (`ssl_verify`, `log_payload_request`, `early_wait_enable`, etc.) to better explain their behavior.
+- **Internationalization**: Updated and synchronized translation files for English (`en.json`), German (`de.json`), French (`fr.json`), and Chinese (`zh.json`) to ensure a consistent user experience.
+
+### Bug Fixes
+- **Missing UI Descriptions**: Fixed a bug where descriptions for boolean options (like `ssl_verify`) would not appear in the UI due to an incorrect schema definition.
+- **IndentationError in Config Flow**: Corrected an `IndentationError` that prevented the configuration flow from loading.
+- **Inconsistent English Translations**: Resolved an issue where the `en.json` file was out of sync with `strings.json`, causing missing text in the English UI.
+
+### Improvements
+- **Code Quality**: Performed general code cleanup and resolved all linting issues reported by `ruff`.
+
+---
+
+## 1.0.0 - November 2025
+
+### 🎉 Major Release - Stability & Enhanced Logging
+
+This release focuses on significantly improving the stability and reliability of the conversation agent, particularly around tool calling and API interactions. It also introduces advanced logging capabilities for better debugging and insight into model behavior.
+
+### Features
+
+-   **Advanced Payload Logging**: Introduced a new option (`payload_log_path`) to log detailed API request/response payloads and system messages to a custom file. This includes `conversation_id`, message length, and execution time, with concise `WARNING` messages in the main Home Assistant log.
+-   **Improved Tool Schema Generation**: Enhanced tool schema generation to support flexible targeting by `area_id`, `device_id`, `floor_id`, and `label_id` for Home Assistant services, in addition to `entity_id`.
+
+### Bug Fixes
+
+-   **Tool Calling Argument Parsing**: Fixed a critical bug where tool call arguments from streaming API responses were not correctly parsed, leading to empty arguments and service call failures.
+-   **Empty Tool Arguments**: Resolved `JSONDecodeError` when the LLM provided empty strings for tool arguments.
+-   **Content Filter Violations**: Mitigated Azure OpenAI content filter violations by changing the tool execution success message to a structured JSON format, reducing false positives.
+-   **`StreamClosed` Error**: Fixed `StreamClosed` errors by ensuring the full error response body is read before raising an exception.
+-   **`AttributeError` Series**: Addressed a series of `AttributeError`s related to missing or incorrectly referenced configuration attributes (`base_url`, `ssl_verify`, `max_completion_tokens`, `_tools`).
+-   **`NameError` Series**: Corrected `NameError`s in the options flow due to missing imports of configuration constants (`CONF_SSL_VERIFY`, `CONF_PAYLOAD_LOG_PATH`).
+-   **Missing Conversation ID in Logs**: Fixed an issue where `conversation_id` was not correctly propagated and logged in custom payload files.
+-   **Empty Response Issue**: Resolved a bug where the agent would report "No textual response was received from the model" despite a valid response, due to an issue in value propagation.
+
+### Improvements
+
+-   **Vocabulary Normalization Clarity**: Provided clarification and debugging for the vocabulary normalization feature, explaining its purpose and how to disable or customize it.
+-   **General Stability & Refactoring**: Numerous minor code refactorings and stability improvements across the component.
+
+### Breaking Changes
+
+-   None. This release is focused on stability and new features.
+
+### Upgrade Guide
+
+1.  Update the component to version `1.0.0`.
+2.  Review the new `payload_log_path` option in the integration's configuration if you wish to enable detailed payload logging.
+3.  If you use vocabulary normalization, review the `assist_synonyms_it.json` file and the `vocabulary_enable` option to ensure it meets your needs.
+
+---
+
+## 0.6.0 - December 2025
+### 🎉 Major Features
+
+- **Tool Calling (Function Calling)**: LLM can now directly call Home Assistant services!
+  - Automatic service discovery and schema generation
+  - Support for all HA service domains (with configurable whitelist)
+  - Safe execution with multiple validation layers
+  - Rate limiting and iteration limits
+  - Multi-turn tool calling loops
+  - Parallel and sequential execution modes
+
+### Features
+
+- **Tool Schema Builder**: Automatically converts HA service schemas to OpenAI tool format
+  - Supports all HA selector types (entity, number, boolean, select, etc.)
+  - Dynamic parameter validation
+  - Description and example extraction
+
+- **Function Executor**: Safe service call execution
+  - Domain whitelist (default: light, switch, climate, cover, fan, media_player, lock, vacuum)
+  - Service blacklist (restart, stop, etc.)
+  - Entity validation (only existing, exposed entities)
+  - Rate limiting (30 calls/min default, configurable)
+  - Comprehensive error handling
+
+- **Tool Manager**: Orchestrates tool calling workflow
+  - Tool schema caching (5-min TTL)
+  - Multi-iteration loop support (max 5 by default)
+  - First chunk tracking for performance metrics
+  - Automatic fallback to regular completion
+
+- **LLM Client Extensions**: Enhanced ChatClient and ResponsesClient
+  - `complete_with_tools()` method for both APIs
+  - Streaming tool call extraction from SSE
+  - Tool call delta accumulation
+  - Backward compatible with existing code
+
+### Configuration
+
+- **New Options**:
+  - `tools_enable`: Enable/disable tool calling (default: true)
+  - `tools_whitelist`: Comma-separated allowed domains
+  - `tools_max_iterations`: Max tool call loops (default: 5)
+  - `tools_max_calls_per_minute`: Rate limit (default: 30)
+  - `tools_parallel_execution`: Execute tools in parallel (default: false)
+
+### Statistics
+
+- **Extended Metrics**: Tool calling statistics tracked
+  - `tools_called`: List of tool names used
+  - `tool_iterations`: Number of tool call loops
+  - `tool_execution_time_ms`: Time spent in tool execution
+  - `tool_errors`: List of tool call errors
+
+- **Aggregated Stats**: Summary across time periods
+  - `total_tool_calls`: Total number of tool calls
+  - `unique_tools_called`: Set of unique tools used
+  - `avg_tool_iterations`: Average loops per request
+  - `tool_error_count`: Total tool call failures
+
+### UI/UX
+
+- **Options Flow**: New Tool Calling section with:
+  - Enable/disable toggle
+  - Domain selection
+  - Iteration and rate limit sliders
+  - Parallel execution checkbox
+
+- **Translations**: English and Italian translations for all tool calling options
+
+### Security
+
+- **Multi-Layer Protection**:
+  1. Domain whitelist validation
+  2. Service blacklist (dangerous services blocked)
+  3. Entity validation (must exist and be exposed)
+  4. Rate limiting (prevents abuse)
+  5. Iteration limits (prevents infinite loops)
+
+### Testing
+
+- **Comprehensive Test Suite**: `tests/test_tools.py`
+  - Schema builder tests
+  - Function executor validation tests
+  - Rate limiting tests
+  - Security tests (blacklist, whitelist)
+  - Tool manager caching tests
+
+### Documentation
+
+- **README**: New Tool Calling section with:
+  - How it works
+  - Configuration guide
+  - Security features
+  - Examples (basic, multi-step, context-aware)
+  - Monitoring and troubleshooting
+  - Best practices
+  - Comparison with Extended OpenAI Conversation
+
+### Bug Fixes
+
+- Fixed track_callback not being passed through tool loop
+- Fixed tool_calls extraction from SSE delta events
+- Fixed metrics not including tool call data
+
+### Breaking Changes
+
+- None - Tool calling is opt-in and backward compatible
+
+### Upgrade Guide
+
+1. Update to 0.6.0
+2. Tool calling is **enabled by default** - to disable:
+   - Go to Settings → Devices & Services → Azure OpenAI SDK Conversation
+   - Click Configure
+   - Disable "Enable Tool Calling"
+3. Review allowed domains whitelist (default is safe)
+4. Test with simple commands first: "Turn on the lights"
+5. Monitor statistics for tool call usage
+
+### Known Limitations
+
+- **Responses API**: Limited tool calling support on reasoning models (o1, o3)
+  - Falls back to regular completion if tools not supported
+  - Full support expected in future API versions
+
+- **Entity Exposure**: Entities must be exposed to conversation
+  - Configure in Settings → Voice Assistants → Expose
+
+- **Service Schemas**: Some complex services may not be fully supported
+  - File a bug report if you encounter issues
+
+### Performance Impact
+
+- **Minimal Overhead**: Tool schema built once and cached
+- **First Request**: +100-200ms (schema building)
+- **Subsequent Requests**: +0-50ms (cache hit)
+- **Tool Execution**: Depends on service (typically 50-200ms per call)
+
+### Migration from Extended OpenAI Conversation
+
+If migrating from Extended OpenAI Conversation:
+
+1. Tool calling is automatically enabled
+2. Default whitelist may differ - review and adjust
+3. Some advanced features may differ - check documentation
+4. Statistics format is different but more detailed
+
+### Acknowledgments
+
+This implementation is inspired by [Extended OpenAI Conversation](https://github.com/jekalmin/extended_openai_conversation) by @jekalmin. Thank you for pioneering this approach!
+
 ## 0.5.1 - November 2025
 
 ### Housekeeping
@@ -142,4 +351,4 @@ Compatible with Home Assistant ≥ 2025.3
 2. Review your options: pick the desired model, timeout and new Web-search settings.  
 3. Update automations or scripts that read the old service response schema.  
 4. If you extended/overrode the previous entity-based agent, port your code to the new agent class.  
-5. Enjoy the new release!  
+5. Enjoy the new release!

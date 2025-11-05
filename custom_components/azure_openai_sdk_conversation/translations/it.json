@@ -36,14 +36,33 @@
           "reasoning_effort": "Sforzo di ragionamento",
           "web_search": "Abilita la ricerca web",
           "search_context_size": "Dimensione del contesto di ricerca",
-          "user_location": "Includi la posizione della casa"
+          "user_location": "Includi la posizione della casa",
+          "ssl_verify": "Verifica certificato SSL",
+          "log_payload_request": "Registra payload delle richieste",
+          "log_payload_response": "Registra payload delle risposte",
+          "log_system_message": "Registra messaggio di sistema",
+          "early_wait_enable": "Abilita attesa anticipata",
+          "vocabulary_enable": "Abilita normalizzazione vocabolario",
+          "log_utterances": "Registra espressioni utente",
+          "mcp_enabled": "Abilita Server MCP (Conversazioni Stateful)",
+          "local_intent_enable": "Abilita Gestione Intenti Locali"
         },
         "data_description": {
           "prompt": "Indica come deve rispondere il LLM. Questo può essere un modello.",
           "reasoning_effort": "Quanti token di ragionamento il modello dovrebbe generare prima di creare una risposta al prompt (per alcuni modelli di ragionamento)",
           "web_search": "Consenti al modello di cercare nel web le informazioni più recenti prima di generare una risposta",
           "search_context_size": "Guida di alto livello per la quantità di spazio della finestra di contesto da utilizzare per la ricerca",
-          "user_location": "Affina i risultati della ricerca in base alla geografia"
+          "user_location": "Affina i risultati della ricerca in base alla geografia",
+          "ssl_verify": "Verifica il certificato SSL dell'endpoint di Azure OpenAI. Disabilita solo per test con certificati autofirmati.",
+          "log_payload_request": "Registra il payload completo della richiesta inviata all'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
+          "log_payload_response": "Registra il payload completo della risposta ricevuta dall'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
+          "log_system_message": "Registra il messaggio di sistema generato che viene inviato al modello. Utile per il debug del contesto fornito al LLM.",
+          "early_wait_enable": "Se il modello impiega troppo tempo a rispondere, l'agente chiederà se si desidera attendere. La risposta verrà recapitata tramite una notifica.",
+          "vocabulary_enable": "Normalizza l'input dell'utente sostituendo i sinonimi (es. 'spegni' e 'disattiva' sono trattati allo stesso modo). Migliora il riconoscimento degli intenti locali.",
+          "log_utterances": "Registra le espressioni utente originali e normalizzate in un file. Utile per il debug del processo di normalizzazione del testo.",
+          "mcp_enabled": "Abilita il server Master Control Program (MCP) per mantenere il contesto della conversazione. Invia solo le modifiche di stato delle entità dopo il primo messaggio, riducendo l'uso di token.",
+          "local_intent_enable": "Gestisce comandi semplici come accendere/spegnere le luci direttamente senza chiamare il LLM. È più veloce ed economico."
+
         }
       }
     },

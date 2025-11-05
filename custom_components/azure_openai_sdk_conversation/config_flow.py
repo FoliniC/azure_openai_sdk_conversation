@@ -64,6 +64,8 @@ from .const import (
     RECOMMENDED_EARLY_WAIT_ENABLE,
     RECOMMENDED_EARLY_WAIT_SECONDS,
     RECOMMENDED_VOCABULARY_ENABLE,
+    CONF_LOCAL_INTENT_ENABLE,
+    RECOMMENDED_LOCAL_INTENT_ENABLE,
     # MCP Server
     CONF_MCP_ENABLED,
     CONF_MCP_TTL_SECONDS,
@@ -73,6 +75,16 @@ from .const import (
     CONF_STATS_ENABLE,
     CONF_STATS_COMPONENT_LOG_PATH,
     CONF_STATS_LLM_LOG_PATH,
+    CONF_TOOLS_ENABLE,
+    CONF_TOOLS_WHITELIST,
+    CONF_TOOLS_MAX_ITERATIONS,
+    CONF_TOOLS_MAX_CALLS_PER_MINUTE,
+    CONF_TOOLS_PARALLEL_EXECUTION,
+    RECOMMENDED_TOOLS_ENABLE,
+    RECOMMENDED_TOOLS_WHITELIST,
+    RECOMMENDED_TOOLS_MAX_ITERATIONS,
+    RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
+    RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
 )
 from .utils import AzureOpenAIValidator
 
@@ -250,6 +262,13 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             )
         ] = str
 
+        # Local Intent Handling
+        cap_schema[
+            vol.Optional(
+                CONF_LOCAL_INTENT_ENABLE, default=RECOMMENDED_LOCAL_INTENT_ENABLE
+            )
+        ] = BooleanSelector()
+
         # Statistics: enable and file paths
         cap_schema[vol.Optional(CONF_STATS_ENABLE, default=True)] = BooleanSelector()
         cap_schema[
@@ -372,12 +391,20 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             # vocabulary defaults
             CONF_VOCABULARY_ENABLE: RECOMMENDED_VOCABULARY_ENABLE,
             CONF_SYNONYMS_FILE: "custom_components/azure_openai_sdk_conversation/assist_synonyms_it.json",
+            # local intent
+            CONF_LOCAL_INTENT_ENABLE: RECOMMENDED_LOCAL_INTENT_ENABLE,
             # utterances log defaults
             CONF_LOG_UTTERANCES: True,
             CONF_UTTERANCES_LOG_PATH: ".storage/azure_openai_conversation_utterances.log",
             # MCP Server defaults
             CONF_MCP_ENABLED: RECOMMENDED_MCP_ENABLED,
             CONF_MCP_TTL_SECONDS: RECOMMENDED_MCP_TTL_SECONDS,
+            # Tool Calling defaults
+            CONF_TOOLS_ENABLE: RECOMMENDED_TOOLS_ENABLE,
+            CONF_TOOLS_WHITELIST: RECOMMENDED_TOOLS_WHITELIST,
+            CONF_TOOLS_MAX_ITERATIONS: RECOMMENDED_TOOLS_MAX_ITERATIONS,
+            CONF_TOOLS_MAX_CALLS_PER_MINUTE: RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
+            CONF_TOOLS_PARALLEL_EXECUTION: RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
         }
         base_opts.update(options)
 

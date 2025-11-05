@@ -36,14 +36,32 @@
           "reasoning_effort": "Reasoning effort",
           "web_search": "Enable web search",
           "search_context_size": "Search context size",
-          "user_location": "Include home location"
+          "user_location": "Include home location",
+          "ssl_verify": "Verify SSL certificate",
+          "log_payload_request": "Log request payloads",
+          "log_payload_response": "Log response payloads",
+          "log_system_message": "Log system message",
+          "early_wait_enable": "Enable early wait",
+          "vocabulary_enable": "Enable vocabulary normalization",
+          "log_utterances": "Log user utterances",
+          "mcp_enabled": "Enable MCP Server (Stateful Conversations)",
+          "local_intent_enable": "Enable Local Intent Handling"
         },
         "data_description": {
           "prompt": "Instruct how the LLM should respond. This can be a template.",
           "reasoning_effort": "How many reasoning tokens the model should generate before creating a response to the prompt (for certain reasoning models)",
           "web_search": "Allow the model to search the web for the latest information before generating a response",
           "search_context_size": "High level guidance for the amount of context window space to use for the search",
-          "user_location": "Refine search results based on geography"
+          "user_location": "Refine search results based on geography",
+          "ssl_verify": "Verify the SSL certificate of the Azure OpenAI endpoint. Disable only for testing with self-signed certificates.",
+          "log_payload_request": "Log the full request payload sent to the Azure OpenAI API. This is useful for debugging but can be verbose.",
+          "log_payload_response": "Log the full response payload received from the Azure OpenAI API. This is useful for debugging but can be verbose.",
+          "log_system_message": "Log the generated system message that is sent to the model. This is useful for debugging the context provided to the LLM.",
+          "early_wait_enable": "If the model takes too long to respond, the agent will ask if you want to wait. The response will be delivered via a notification.",
+          "vocabulary_enable": "Normalize user input by replacing synonyms (e.g., 'turn off' and 'deactivate' are treated as the same). This improves local intent recognition.",
+          "log_utterances": "Log original and normalized user utterances to a file. This is useful for debugging the text normalization process.",
+          "mcp_enabled": "Enable the Master Control Program (MCP) server to maintain conversation context. This sends only entity state changes after the first message, reducing token usage.",
+          "local_intent_enable": "Handle simple commands like turning lights on/off directly without calling the LLM. This is faster and cheaper."
         }
       }
     },

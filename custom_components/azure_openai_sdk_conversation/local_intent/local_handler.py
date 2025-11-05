@@ -7,6 +7,7 @@ reducing latency and costs.
 
 from __future__ import annotations
 
+import time
 from typing import Optional
 
 from homeassistant.components import conversation
@@ -78,6 +79,7 @@ class LocalIntentHandler:
         self,
         normalized_text: str,
         user_input: ConversationInput,
+        start_time: float,
     ) -> Optional[ConversationResult]:
         """
         Try to handle request with local intent.
@@ -85,6 +87,7 @@ class LocalIntentHandler:
         Args:
             normalized_text: Normalized user text
             user_input: Original conversation input
+            start_time: The time the request processing started
 
         Returns:
             ConversationResult if handled locally, None otherwise
@@ -92,7 +95,7 @@ class LocalIntentHandler:
         if not self._config.local_intent_enable:
             return None
 
-        # Parse intent
+        # 2. Check for on/off intent
         intent_data = self._parse_onoff_intent(normalized_text)
         if not intent_data:
             return None
@@ -118,6 +121,17 @@ class LocalIntentHandler:
             language=getattr(user_input, "language", None),
             action=action,
             results=results,
+        )
+
+        # Log the local action
+        execution_time_ms = (time.perf_counter() - start_time) * 1000
+        await self._logger.log_local_action(
+            conversation_id=user_input.conversation_id,
+            user_message=user_input.text,
+            action=action,
+            entities=entity_ids,
+            response=summary,
+            execution_time_ms=execution_time_ms,
         )
 
         # Create result
@@ -326,5 +340,6 @@ class LocalIntentHandler:
         return header + "\n".join(lines)
 
     async def close(self) -> None:
-        """Clean up resources."""
+        """
+        Clean up resources."""
         await self._normalizer.close()

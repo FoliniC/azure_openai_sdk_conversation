@@ -11,9 +11,11 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
+import logging
 
 from homeassistant.core import HomeAssistant
 
+from .. import const
 from ..const import (
     DOMAIN,
     CONF_STATS_ENABLE,
@@ -23,7 +25,11 @@ from ..const import (
     STATS_OVERRIDE_DISABLE,
     CONF_STATS_AGGREGATED_FILE,
     CONF_STATS_AGGREGATION_INTERVAL,
+    CONF_PAYLOAD_LOG_PATH,
+    DEFAULT_LOG_MAX_SSE_LINES,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass
@@ -49,6 +55,7 @@ class AgentConfig:
     top_p: float = 1.0
     max_tokens: int = 512
     api_timeout: int = 30
+    ssl_verify: bool = True
     reasoning_effort: str = "medium"
 
     # System prompt
@@ -66,7 +73,8 @@ class AgentConfig:
     log_payload_response: bool = False
     log_system_message: bool = False
     log_max_payload_chars: int = 12000
-    log_max_sse_lines: int = 10
+    log_max_sse_lines: int = DEFAULT_LOG_MAX_SSE_LINES
+    payload_log_path: Optional[str] = None
     debug_sse: bool = False
     debug_sse_lines: int = 10
 
@@ -94,6 +102,12 @@ class AgentConfig:
     mcp_enabled: bool = True
     mcp_ttl_seconds: int = 3600
 
+    # Tool Calling
+    tools_enable: bool = True
+    tools_whitelist: str = "light,switch,climate,cover,fan,media_player,lock,vacuum"
+    tools_max_iterations: int = 5
+    tools_max_calls_per_minute: int = 30
+    tools_parallel_execution: bool = False
     # Web search
     web_search_enable: bool = False
     bing_api_key: Optional[str] = None
@@ -206,6 +220,7 @@ class AgentConfig:
             top_p=get_float("top_p", 1.0),
             max_tokens=get_int("max_tokens", 512),
             api_timeout=get_int("api_timeout", 30),
+            ssl_verify=get_bool("ssl_verify", True),
             reasoning_effort=get_str("reasoning_effort", "medium"),
             # System prompt
             system_prompt=get_str(
@@ -221,7 +236,13 @@ class AgentConfig:
             log_payload_response=get_bool("log_payload_response", False),
             log_system_message=get_bool("log_system_message", False),
             log_max_payload_chars=get_int("log_max_payload_chars", 12000),
-            log_max_sse_lines=get_int("log_max_sse_lines", 10),
+            log_max_sse_lines=get_int(
+                const.CONF_LOG_MAX_SSE_LINES, DEFAULT_LOG_MAX_SSE_LINES
+            ),
+            payload_log_path=resolve_path(
+                data.get(CONF_PAYLOAD_LOG_PATH),
+                ".storage/azure_openai_payloads.log",
+            ),
             debug_sse=get_bool("debug_sse", False),
             debug_sse_lines=get_int("debug_sse_lines", 10),
             # Early wait
@@ -248,6 +269,15 @@ class AgentConfig:
             # MCP
             mcp_enabled=get_bool("mcp_enabled", True),
             mcp_ttl_seconds=get_int("mcp_ttl_seconds", 3600),
+            # Tool Calling
+            tools_enable=get_bool("tools_enable", True),
+            tools_whitelist=get_str(
+                "tools_whitelist",
+                "light,switch,climate,cover,fan,media_player,lock,vacuum",
+            ),
+            tools_max_iterations=get_int("tools_max_iterations", 5),
+            tools_max_calls_per_minute=get_int("tools_max_calls_per_minute", 30),
+            tools_parallel_execution=get_bool("tools_parallel_execution", False),
             # Web search
             web_search_enable=get_bool(
                 "web_search", get_bool("enable_web_search", False)
@@ -337,6 +367,16 @@ class AgentConfig:
         if self.api_timeout < 5:
             errors.append(f"api_timeout must be >= 5, got {self.api_timeout}")
 
+        if self.tools_max_iterations < 1 or self.tools_max_iterations > 20:
+            errors.append(
+                f"tools_max_iterations must be in [1, 20], got {self.tools_max_iterations}"
+            )
+
+        if self.tools_max_calls_per_minute < 1:
+            errors.append(
+                f"tools_max_calls_per_minute must be > 0, got {self.tools_max_calls_per_minute}"
+            )
+
         return errors
 
     def to_dict(self) -> dict[str, Any]:
@@ -366,13 +406,42 @@ class AgentConfig:
             "stats_enable": self.stats_enable,
             "mcp_enabled": self.mcp_enabled,
             "web_search_enable": self.web_search_enable,
+            "tools_enable": self.tools_enable,
         }
 
         return data
 
     @staticmethod
-    def _redact_key(key: str) -> str:
+    def _redact_key(key: Optional[str]) -> str:
         """Redact API key for logging."""
         if not key or len(key) <= 8:
             return "***"
         return f"{key[:3]}***{key[-3:]}"
+
+
+async def async_log_to_file(
+    hass: HomeAssistant,
+    file_path: str,
+    data: dict[str, Any],
+) -> None:
+    """Log structured data to a custom file asynchronously."""
+
+    line = json.dumps(data, ensure_ascii=False)
+
+    def _write() -> None:  # type: ignore
+        """Blocking I/O operation to write to the file."""
+        try:
+            # Ensure directory exists
+            abs_path = hass.config.path(file_path)
+            parent_dir = os.path.dirname(abs_path)
+            if not os.path.exists(parent_dir):
+                os.makedirs(parent_dir)
+
+            # Append to file
+            with open(abs_path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+
+        except Exception as e:
+            _LOGGER.error("Failed to write to custom log file %s: %r", file_path, e)
+
+    await hass.async_add_executor_job(_write)

@@ -298,6 +298,36 @@ class StatsManager:
             completion_cost = stats.total_completion_tokens * pricing["completion"]
             stats.estimated_cost_usd = prompt_cost + completion_cost
 
+        # Tool calling metrics
+        tool_iterations_list = []
+        all_tools_called = set()
+
+        for m in metrics:
+            # Tool calls
+            if m.tools_called:
+                stats.total_tool_calls += len(m.tools_called)
+                all_tools_called.update(m.tools_called)
+
+            # Tool iterations
+            if m.tool_iterations > 0:
+                tool_iterations_list.append(m.tool_iterations)
+                stats.max_tool_iterations = max(
+                    stats.max_tool_iterations, m.tool_iterations
+                )
+
+            # Tool errors
+            if m.tool_errors:
+                stats.tool_error_count += len(m.tool_errors)
+
+        # Store unique tools
+        stats.unique_tools_called = all_tools_called
+
+        # Average iterations
+        if tool_iterations_list:
+            stats.avg_tool_iterations = sum(tool_iterations_list) / len(
+                tool_iterations_list
+            )
+
         return stats
 
     def _get_pricing(self, model: str) -> Dict[str, float]:
@@ -393,6 +423,20 @@ class StatsManager:
         for s in stats_list:
             for err_type, count in s.error_types.items():
                 all_errors[err_type] += count
+        # Tool calling summary
+        total_tool_calls_all = sum(s.total_tool_calls for s in stats_list)
+        unique_tools_all = set()
+        for s in stats_list:
+            unique_tools_all.update(s.unique_tools_called)
+
+        avg_iterations_list = [
+            s.avg_tool_iterations for s in stats_list if s.avg_tool_iterations > 0
+        ]
+        avg_iterations = (
+            sum(avg_iterations_list) / len(avg_iterations_list)
+            if avg_iterations_list
+            else 0.0
+        )
 
         return {
             "period_hours": hours,
@@ -413,4 +457,8 @@ class StatsManager:
             "avg_execution_time_ms": round(avg_exec_time, 2),
             "total_tokens": total_tokens_all,
             "estimated_cost_usd": round(total_cost, 4),
+            "total_tool_calls": total_tool_calls_all,
+            "unique_tools_called": list(unique_tools_all),
+            "avg_tool_iterations": round(avg_iterations, 2),
+            "tool_error_count": sum(s.tool_error_count for s in stats_list),
         }

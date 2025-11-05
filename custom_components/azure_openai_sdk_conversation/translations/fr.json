@@ -1,19 +1,68 @@
 {
   "config": {
     "abort": {
-      "single_instance_allowed": "Déjà configuré. Une seule configuration possible."
+      "already_configured": "Déjà configuré. Une seule configuration possible."
     },
     "error": {
-      "cannot_connect": "Échec de la connexion",
+      "cannot_connect": "Impossible de se connecter",
       "invalid_auth": "Authentification invalide",
       "unknown": "Erreur inattendue"
     },
     "step": {
       "user": {
+        "description": "Obtenez l'URL de base de l'API et la version à partir de l'URI cible dans EndPoint dans Azure AI Foundry ou le portail Azure.",
         "data": {
           "api_key": "Clé API",
-          "api_base": "Base d'API dans Azure",
-          "api_version": "Version de l'API"
+          "api_base": "URL de base de l'API"
+        },
+        "data_description": {
+          "api_key": "",
+          "api_base": "Exemple d'URL de base : https://xyz.cognitiveservices.azure.com"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "Instructions",
+          "chat_model": "Modèle",
+          "max_tokens": "Nombre maximum de jetons à retourner dans la réponse",
+          "temperature": "Température",
+          "top_p": "Top P",
+          "api_version": "Version de l'API",
+          "llm_hass_api": "Voulez-vous utiliser l'API LLM HASS ?",
+          "recommended": "Paramètres de modèle recommandés",
+          "reasoning_effort": "Effort de raisonnement",
+          "web_search": "Activer la recherche Web",
+          "search_context_size": "Taille du contexte de recherche",
+          "user_location": "Inclure l'emplacement du domicile",
+          "ssl_verify": "Vérifier le certificat SSL",
+          "log_payload_request": "Journaliser les charges utiles des requêtes",
+          "log_payload_response": "Journaliser les charges utiles des réponses",
+          "log_system_message": "Journaliser le message système",
+          "early_wait_enable": "Activer l'attente anticipée",
+          "vocabulary_enable": "Activer la normalisation du vocabulaire",
+          "log_utterances": "Journaliser les énoncés de l'utilisateur",
+          "mcp_enabled": "Activer le serveur MCP (Conversations avec état)",
+          "local_intent_enable": "Activer le traitement local des intentions"
+        },
+        "data_description": {
+          "prompt": "Indiquez comment le LLM doit répondre. Cela peut être un modèle.",
+          "reasoning_effort": "Combien de jetons de raisonnement le modèle doit générer avant de créer une réponse à l'invite (pour certains modèles de raisonnement)",
+          "web_search": "Autoriser le modèle à rechercher sur le Web les dernières informations avant de générer une réponse",
+          "search_context_size": "Guide de haut niveau pour la quantité d'espace de la fenêtre de contexte à utiliser pour la recherche",
+          "user_location": "Affiner les résultats de recherche en fonction de la géographie",
+          "ssl_verify": "Vérifie le certificat SSL du point de terminaison Azure OpenAI. Désactivez uniquement pour les tests avec des certificats auto-signés.",
+          "log_payload_request": "Journalise la charge utile complète de la requête envoyée à l'API Azure OpenAI. Ceci est utile pour le débogage mais peut être verbeux.",
+          "log_payload_response": "Journalise la charge utile complète de la réponse reçue de l'API Azure OpenAI. Ceci est utile pour le débogage mais peut être verbeux.",
+          "log_system_message": "Journalise le message système généré qui est envoyé au modèle. Ceci est utile pour déboguer le contexte fourni au LLM.",
+          "early_wait_enable": "Si le modèle met trop de temps à répondre, l'agent vous demandera si vous souhaitez attendre. La réponse sera livrée via une notification.",
+          "vocabulary_enable": "Normalise l'entrée de l'utilisateur en remplaçant les synonymes (par exemple, 'éteindre' et 'désactiver' sont traités de la même manière). Cela améliore la reconnaissance des intentions locales.",
+          "log_utterances": "Journalise les énoncés originaux et normalisés de l'utilisateur dans un fichier. Ceci est utile pour déboguer le processus de normalisation du texte.",
+          "mcp_enabled": "Active le serveur Master Control Program (MCP) pour maintenir le contexte de la conversation. N'envoie que les changements d'état des entités après le premier message, réduisant ainsi l'utilisation des jetons.",
+          "local_intent_enable": "Gère les commandes simples comme allumer/éteindre les lumières directement sans appeler le LLM. C'est plus rapide et moins cher."
         }
       }
     }

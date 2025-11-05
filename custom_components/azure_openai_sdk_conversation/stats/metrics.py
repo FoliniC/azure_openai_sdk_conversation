@@ -44,6 +44,13 @@ class RequestMetrics:
     response_length: int = 0
     first_chunk_time_ms: Optional[float] = None
 
+    # Tool calling statistics
+    total_tool_calls: int = 0
+    unique_tools_called: set[str] = field(default_factory=set)
+    avg_tool_iterations: float = 0.0
+    max_tool_iterations: int = 0
+    tool_error_count: int = 0
+
 
 @dataclass
 class AggregatedStats:

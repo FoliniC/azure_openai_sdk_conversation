@@ -1,259 +1,206 @@
 """
-Server-Sent Events (SSE) stream parser for Azure OpenAI APIs.
+SSE Stream Parser with tool call accumulation and debugging.
 
-Parses SSE streams and yields structured events with type classification.
+Properly handles streaming tool call arguments from delta fragments.
 """
 
 from __future__ import annotations
 
 import json
-from typing import Any, AsyncIterator, Optional
+import logging
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
-from ..core.logger import AgentLogger
+LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class ToolCallAccumulator:
+    """Accumulator for streaming tool call arguments."""
+
+    id: str
+    function_name: str
+    arguments_fragments: list[str] = field(default_factory=list)
+
+    @property
+    def accumulated_arguments(self) -> str:
+        """Get the accumulated argument string."""
+        return "".join(self.arguments_fragments)
+
+    def add_argument_fragment(self, fragment: str) -> None:
+        """Add an argument fragment."""
+        self.arguments_fragments.append(fragment)
+
+    def is_complete(self) -> bool:
+        """Check if we have a complete JSON object."""
+        args = self.accumulated_arguments.strip()
+        if not args:
+            # Empty arguments can be valid if the function has no params,
+            # but the model should send '{}'. We'll be lenient.
+            return True
+        try:
+            json.loads(args)
+            return True
+        except json.JSONDecodeError:
+            return False
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to OpenAI tool call dict."""
+        return {
+            "id": self.id,
+            "type": "function",
+            "function": {
+                "name": self.function_name,
+                "arguments": self.accumulated_arguments,
+            },
+        }
+
+
+@dataclass
+class ChoiceAccumulator:
+    """Accumulator for a single choice with potential tool calls."""
+
+    index: int
+    content_fragments: list[str] = field(default_factory=list)
+    # Use a list to store tool calls in order based on their index
+    tool_calls: list[ToolCallAccumulator] = field(default_factory=list)
+    finish_reason: Optional[str] = None
+
+    @property
+    def accumulated_content(self) -> str:
+        """Get the accumulated content."""
+        return "".join(self.content_fragments)
+
+    def add_content_fragment(self, fragment: str) -> None:
+        """Add a content fragment."""
+        if fragment:
+            self.content_fragments.append(fragment)
+
+    def process_tool_call_delta(self, delta: dict[str, Any]) -> None:
+        """Process a tool call delta chunk from the stream."""
+        index = delta.get("index")
+        if index is None:
+            return
+
+        # Ensure the list of accumulators is long enough
+        while len(self.tool_calls) <= index:
+            self.tool_calls.append(ToolCallAccumulator(id="", function_name=""))
+
+        accumulator = self.tool_calls[index]
+
+        # The 'id' is usually sent only in the first delta for a tool call
+        if "id" in delta and delta["id"]:
+            accumulator.id = delta["id"]
+
+        function_delta = delta.get("function", {})
+        if function_delta:
+            # The 'name' is also usually in the first delta
+            if "name" in function_delta and function_delta["name"]:
+                accumulator.function_name = function_delta["name"]
+
+            # 'arguments' fragments are streamed in subsequent deltas
+            if "arguments" in function_delta:
+                accumulator.add_argument_fragment(function_delta["arguments"])
+
+    def get_complete_tool_calls(self) -> list[dict[str, Any]]:
+        """Get all complete and valid tool calls from this choice."""
+        complete = []
+        for tool_call in self.tool_calls:
+            # A tool call is only valid if it has an ID and name and the arguments are valid JSON
+            if tool_call.id and tool_call.function_name and tool_call.is_complete():
+                complete.append(tool_call.to_dict())
+        return complete
 
 
 class SSEStreamParser:
-    """Parser for Server-Sent Events streams from Azure OpenAI."""
+    """Parser for Azure OpenAI SSE streaming responses."""
 
-    def __init__(self, logger: AgentLogger) -> None:
-        """
-        Initialize SSE parser.
+    def __init__(self, logger: Optional[logging.Logger] = None):
+        """Initialize the parser."""
+        self._logger = logger or LOGGER
 
-        Args:
-            logger: Logger instance for debugging
-        """
-        self._logger = logger
-
-    async def parse_stream(
+    def parse_stream(
         self,
-        line_iterator: AsyncIterator[str],
-    ) -> AsyncIterator[tuple[str, Any]]:
-        """
-        Parse SSE stream and yield (event_type, event_data) tuples.
+        stream_lines: list[str],
+    ) -> tuple[str, list[dict[str, Any]], dict[str, int]]:
+        """Parse a complete SSE stream from collected lines.
 
         Args:
-            line_iterator: Async iterator over raw lines from response
-
-        Yields:
-            Tuples of (event_type, event_data) where:
-            - event_type: "delta" | "usage" | "error" | "done" | "unknown"
-            - event_data: Parsed JSON dict or raw string
-        """
-        current_event: Optional[str] = None
-        data_lines: list[str] = []
-
-        async for raw_line in line_iterator:
-            if raw_line is None:
-                continue
-
-            line = raw_line.rstrip("\n\r")
-
-            # Empty line signals end of event
-            if not line:
-                if data_lines:
-                    # Parse accumulated data
-                    event_type, event_data = self._process_event(
-                        current_event, data_lines
-                    )
-                    if event_type:
-                        yield event_type, event_data
-
-                    # Reset for next event
-                    current_event = None
-                    data_lines = []
-                continue
-
-            # Comment line (ignore)
-            if line.startswith(":"):
-                continue
-
-            # Event type line
-            if line.startswith("event:"):
-                current_event = line[6:].strip()
-                continue
-
-            # Data line
-            if line.startswith("data:"):
-                data_lines.append(line[5:].lstrip())
-                continue
-
-            # Unknown line format (log for debugging)
-            self._logger.debug("Unknown SSE line format: %s", line[:100])
-
-        # Process any remaining data
-        if data_lines:
-            event_type, event_data = self._process_event(current_event, data_lines)
-            if event_type:
-                yield event_type, event_data
-
-    def _process_event(
-        self,
-        event_name: Optional[str],
-        data_lines: list[str],
-    ) -> tuple[Optional[str], Any]:
-        """
-        Process accumulated event data and classify event type.
-
-        Args:
-            event_name: Event name from "event:" line (if any)
-            data_lines: Accumulated data lines
+            stream_lines: List of SSE lines collected from response
 
         Returns:
-            Tuple of (event_type, parsed_data)
-            Returns (None, None) if event should be skipped
+            Tuple of (content_text, tool_calls, token_counts)
         """
-        if not data_lines:
-            return None, None
+        accumulators: dict[int, ChoiceAccumulator] = {}
+        token_counts = {"prompt": 0, "completion": 0, "total": 0}
 
-        # Join data lines
-        data_str = "\n".join(data_lines).strip()
+        for line in stream_lines:
+            line = line.strip()
+            if not line or not line.startswith("data: "):
+                continue
 
-        # Check for [DONE] marker
-        if data_str == "[DONE]":
-            return "done", {}
+            if "[DONE]" in line:
+                break
 
-        # Try to parse as JSON
-        try:
-            data = json.loads(data_str)
-        except json.JSONDecodeError:
-            # Not JSON, return as raw string
-            return "unknown", data_str
+            data_str = line[6:]
+            try:
+                delta = json.loads(data_str)
+            except json.JSONDecodeError:
+                self._logger.warning("Failed to parse SSE delta: %s", data_str)
+                continue
 
-        # Classify event type based on content and event name
-        event_type = self._classify_event(event_name, data)
+            for choice in delta.get("choices", []):
+                index = choice.get("index", 0)
+                if index not in accumulators:
+                    accumulators[index] = ChoiceAccumulator(index=index)
 
-        return event_type, data
+                acc = accumulators[index]
 
-    @staticmethod
-    def _classify_event(event_name: Optional[str], data: Any) -> str:
-        """
-        Classify event type based on event name and data structure.
+                if "finish_reason" in choice:
+                    acc.finish_reason = choice.get("finish_reason")
 
-        Returns:
-            "delta" | "usage" | "error" | "done" | "unknown"
-        """
-        if not isinstance(data, dict):
-            return "unknown"
+                if "delta" in choice:
+                    delta_obj = choice["delta"]
+                    if delta_obj.get("content"):
+                        acc.add_content_fragment(delta_obj["content"])
 
-        # Use explicit event name if available
-        if event_name:
-            name_lower = event_name.lower()
+                    for tool_call_delta in delta_obj.get("tool_calls", []):
+                        acc.process_tool_call_delta(tool_call_delta)
 
-            # Delta events (content streaming)
-            if any(
-                x in name_lower
-                for x in [
-                    "delta",
-                    "output_text.delta",
-                    "message.delta",
-                    "content.delta",
-                ]
-            ):
-                return "delta"
+            if "usage" in delta and delta["usage"]:
+                usage = delta["usage"]
+                if "prompt_tokens" in usage:
+                    token_counts["prompt"] = usage["prompt_tokens"]
+                if "completion_tokens" in usage:
+                    token_counts["completion"] = usage["completion_tokens"]
+                if "total_tokens" in usage:
+                    token_counts["total"] = usage["total_tokens"]
 
-            # Usage events (token counts)
-            if "usage" in name_lower:
-                return "usage"
+        primary_choice = accumulators.get(0)
+        if not primary_choice:
+            return "", [], token_counts
 
-            # Error events
-            if "error" in name_lower:
-                return "error"
+        complete_tool_calls = primary_choice.get_complete_tool_calls()
 
-            # Completion events
-            if any(x in name_lower for x in ["done", "completed", "finish", "end"]):
-                return "done"
+        # Debug logging
+        for tool_call in primary_choice.tool_calls:
+            if tool_call.is_complete():
+                self._logger.debug(
+                    "Complete tool call parsed: id=%s, name=%s, args=%s",
+                    tool_call.id,
+                    tool_call.function_name,
+                    tool_call.accumulated_arguments,
+                )
+            else:
+                self._logger.warning(
+                    "Incomplete tool call parsed: id=%s, name=%s, args=%s",
+                    tool_call.id,
+                    tool_call.function_name,
+                    tool_call.accumulated_arguments,
+                )
 
-        # Infer from data structure
-
-        # Check for error indicators
-        if "error" in data:
-            return "error"
-
-        # Check for usage/token information
-        if "usage" in data or any(
-            k in data
-            for k in [
-                "prompt_tokens",
-                "completion_tokens",
-                "total_tokens",
-                "input_tokens",
-                "output_tokens",
-            ]
-        ):
-            return "usage"
-
-        # Check for delta/content indicators
-        if any(k in data for k in ["delta", "choices", "output", "content"]):
-            # Check if it contains actual text content
-            if SSEStreamParser._has_text_content(data):
-                return "delta"
-
-            # Check if it's a completion marker
-            if SSEStreamParser._is_completion_marker(data):
-                return "done"
-
-        # Check for explicit type field
-        event_type = data.get("type", data.get("event", "")).lower()
-        if event_type:
-            if "delta" in event_type or "content" in event_type:
-                return "delta"
-            elif "error" in event_type:
-                return "error"
-            elif "done" in event_type or "complete" in event_type:
-                return "done"
-
-        # Default to unknown
-        return "unknown"
-
-    @staticmethod
-    def _has_text_content(data: dict) -> bool:
-        """Check if data contains actual text content (not empty)."""
-
-        def search_text(obj: Any, depth: int = 0) -> bool:
-            if depth > 5:  # Prevent infinite recursion
-                return False
-
-            if isinstance(obj, str) and obj.strip():
-                return True
-
-            if isinstance(obj, dict):
-                # Check common text fields
-                for key in ["text", "content", "message"]:
-                    if key in obj:
-                        val = obj[key]
-                        if isinstance(val, str) and val.strip():
-                            return True
-                        if search_text(val, depth + 1):
-                            return True
-
-                # Recursively search other fields
-                for val in obj.values():
-                    if search_text(val, depth + 1):
-                        return True
-
-            if isinstance(obj, list):
-                for item in obj:
-                    if search_text(item, depth + 1):
-                        return True
-
-            return False
-
-        return search_text(data)
-
-    @staticmethod
-    def _is_completion_marker(data: dict) -> bool:
-        """Check if data indicates completion/finish."""
-        # Check choices[].finish_reason
-        choices = data.get("choices", [])
-        if isinstance(choices, list):
-            for choice in choices:
-                if isinstance(choice, dict):
-                    finish_reason = choice.get("finish_reason")
-                    if finish_reason and finish_reason != "null":
-                        return True
-
-        # Check for explicit done/complete flags
-        return any(
-            data.get(key) in [True, "done", "completed", "finished"]
-            for key in ["done", "completed", "finished", "is_complete"]
+        return (
+            primary_choice.accumulated_content,
+            complete_tool_calls,
+            token_counts,
         )

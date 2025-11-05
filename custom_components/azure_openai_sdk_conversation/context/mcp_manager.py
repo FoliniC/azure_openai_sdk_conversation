@@ -189,6 +189,12 @@ This is your initial state snapshot. In subsequent messages, you will only recei
             if entity_id not in stored_states:
                 new.append(current)
             elif stored_states[entity_id] != current:
+                self._logger.debug(
+                    "MCP Delta: State change for '%s': from '%s' to '%s'",
+                    entity_id,
+                    stored_states[entity_id].state,
+                    current.state,
+                )
                 changed.append(current)
 
         # Check for removed entities
