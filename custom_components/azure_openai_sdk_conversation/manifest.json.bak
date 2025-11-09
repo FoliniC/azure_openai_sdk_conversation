@@ -1,13 +1,13 @@
 {  
   "domain": "azure_openai_sdk_conversation",  
-  "name": "Azure OpenAI SDK Conversation",  
+  "name": "Azure OpenAI SDK Conversation ",  
   "dependencies": [  
     "conversation",  
     "assist_pipeline",  
     "intent"  
   ],  
   "config_flow": true,  
-  "version": "0.3.2",  
+  "version": "1.0.2",  
   "documentation": "https://github.com/FoliniC/azure_openai_sdk_conversation",  
   "issue_tracker": "https://github.com/FoliniC/azure_openai_sdk_conversation/issues",
   "requirements": [  

@@ -1,7 +1,7 @@
 {
   "config": {
     "abort": {
-      "single_instance_allowed": "Bereits konfiguriert. Es ist nur eine einzige Konfiguration möglich."
+      "already_configured": "Bereits konfiguriert. Nur eine Konfiguration möglich."
     },
     "error": {
       "cannot_connect": "Verbindung fehlgeschlagen",
@@ -10,10 +10,59 @@
     },
     "step": {
       "user": {
+        "description": "Holen Sie sich die Basis-API-URL und die Version aus dem Ziel-URI in EndPoint in Azure AI Foundry oder im Azure-Portal.",
         "data": {
-          "api_key": "API Schlüssel",
-          "api_base": "API Basis in Azure",
-          "api_version": "API Version"
+          "api_key": "API-Schlüssel",
+          "api_base": "Basis-API-URL"
+        },
+        "data_description": {
+          "api_key": "",
+          "api_base": "Beispiel-Basis-URL: https://xyz.cognitiveservices.azure.com"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "Anweisungen",
+          "chat_model": "Modell",
+          "max_tokens": "Maximale Anzahl von Token, die in der Antwort zurückgegeben werden sollen",
+          "temperature": "Temperatur",
+          "top_p": "Top P",
+          "api_version": "API Version",
+          "llm_hass_api": "Möchten Sie die LLM HASS API verwenden?",
+          "recommended": "Empfohlene Modelleinstellungen",
+          "reasoning_effort": "Begründungsaufwand",
+          "web_search": "Websuche aktivieren",
+          "search_context_size": "Größe des Suchkontexts",
+          "user_location": "Heimatstandort einbeziehen",
+          "ssl_verify": "SSL-Zertifikat überprüfen",
+          "log_payload_request": "Anfrage-Payloads protokollieren",
+          "log_payload_response": "Antwort-Payloads protokollieren",
+          "log_system_message": "Systemnachricht protokollieren",
+          "early_wait_enable": "Frühes Warten aktivieren",
+          "vocabulary_enable": "Vokabularnormalisierung aktivieren",
+          "log_utterances": "Benutzeräußerungen protokollieren",
+          "mcp_enabled": "MCP-Server aktivieren (Zustandsbehaftete Konversationen)",
+          "local_intent_enable": "Lokale Absichtserkennung aktivieren"
+        },
+        "data_description": {
+          "prompt": "Geben Sie an, wie der LLM reagieren soll. Dies kann eine Vorlage sein.",
+          "reasoning_effort": "Wie viele Begründungs-Token das Modell generieren soll, bevor eine Antwort auf die Eingabeaufforderung erstellt wird (für bestimmte Begründungsmodelle)",
+          "web_search": "Erlauben Sie dem Modell, im Web nach den neuesten Informationen zu suchen, bevor eine Antwort generiert wird",
+          "search_context_size": "Allgemeine Anleitung für die Größe des für die Suche zu verwendenden Kontextfensters",
+          "user_location": "Suchergebnisse basierend auf der Geografie verfeinern",
+          "ssl_verify": "Überprüft das SSL-Zertifikat des Azure OpenAI-Endpunkts. Deaktivieren Sie dies nur zum Testen mit selbstsignierten Zertifikaten.",
+          "log_payload_request": "Protokolliert den vollständigen an die Azure OpenAI-API gesendeten Anfrage-Payload. Dies ist nützlich für das Debugging, kann aber ausführlich sein.",
+          "log_payload_response": "Protokolliert den vollständigen von der Azure OpenAI-API empfangenen Antwort-Payload. Dies ist nützlich für das Debugging, kann aber ausführlich sein.",
+          "log_system_message": "Protokolliert die generierte Systemnachricht, die an das Modell gesendet wird. Dies ist nützlich, um den dem LLM bereitgestellten Kontext zu debuggen.",
+          "early_wait_enable": "Wenn das Modell zu lange zum Antworten braucht, fragt der Agent, ob Sie warten möchten. Die Antwort wird über eine Benachrichtigung zugestellt.",
+          "vocabulary_enable": "Normalisiert die Benutzereingabe durch Ersetzen von Synonymen (z. B. werden 'ausschalten' und 'deaktivieren' gleich behandelt). Dies verbessert die Erkennung lokaler Absichten.",
+          "log_utterances": "Protokolliert ursprüngliche und normalisierte Benutzeräußerungen in einer Datei. Dies ist nützlich zum Debuggen des Textnormalisierungsprozesses.",
+          "mcp_enabled": "Aktiviert den Master Control Program (MCP)-Server, um den Konversationskontext beizubehalten. Sendet nach der ersten Nachricht nur noch Entitätsstatusänderungen, was die Token-Nutzung reduziert.",
+          "local_intent_enable": "Behandelt einfache Befehle wie das Ein- und Ausschalten von Lichtern direkt, ohne das LLM aufzurufen. Dies ist schneller und kostengünstiger."
         }
       }
     }

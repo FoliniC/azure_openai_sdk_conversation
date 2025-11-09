@@ -1,19 +1,68 @@
 {
   "config": {
     "abort": {
-      "single_instance_allowed": "已配置過設定，僅能配置一次"
+      "already_configured": "已配置。只可能有一个配置。"
     },
     "error": {
-      "cannot_connect": "連結失敗",
-      "invalid_auth": "無效的驗證",
-      "unknown": "非預期的錯誤"
+      "cannot_connect": "无法连接",
+      "invalid_auth": "无效的身份验证",
+      "unknown": "意外错误"
     },
     "step": {
       "user": {
+        "description": "从Azure AI Foundry或Azure门户中的EndPoint的目标URI获取基本API URL和版本。",
         "data": {
-          "api_key": "API 金鑰",
-          "api_base": "API 端點",
-          "api_version": "API version"
+          "api_key": "API 密钥",
+          "api_base": "基本 API URL"
+        },
+        "data_description": {
+          "api_key": "",
+          "api_base": "示例基本 URL：https://xyz.cognitiveservices.azure.com"
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "prompt": "说明",
+          "chat_model": "模型",
+          "max_tokens": "响应中返回的最大令牌数",
+          "temperature": "温度",
+          "top_p": "Top P",
+          "api_version": "API 版本",
+          "llm_hass_api": "您想使用 LLM HASS API 吗？",
+          "recommended": "推荐的模型设置",
+          "reasoning_effort": "推理工作量",
+          "web_search": "启用网络搜索",
+          "search_context_size": "搜索上下文大小",
+          "user_location": "包括家庭位置",
+          "ssl_verify": "验证SSL证书",
+          "log_payload_request": "记录请求有效负载",
+          "log_payload_response": "记录响应有效负载",
+          "log_system_message": "记录系统消息",
+          "early_wait_enable": "启用提前等待",
+          "vocabulary_enable": "启用词汇规范化",
+          "log_utterances": "记录用户话语",
+          "mcp_enabled": "启用MCP服务器（有状态对话）",
+          "local_intent_enable": "启用本地意图处理"
+        },
+        "data_description": {
+          "prompt": "指示LLM应如何响应。这可以是一个模板。",
+          "reasoning_effort": "模型在创建对提示的响应之前应生成多少推理令牌（对于某些推理模型）",
+          "web_search": "允许模型在生成响应之前在网络上搜索最新信息",
+          "search_context_size": "用于搜索的上下文窗口空间量的高级指导",
+          "user_location": "根据地理位置优化搜索结果",
+          "ssl_verify": "验证Azure OpenAI端点的SSL证书。仅在测试自签名证书时禁用。",
+          "log_payload_request": "记录发送到Azure OpenAI API的完整请求有效负载。这对于调试很有用，但可能会很冗长。",
+          "log_payload_response": "记录从Azure OpenAI API收到的完整响应有效负载。这对于调试很有用，但可能会很冗長。",
+          "log_system_message": "记录发送到模型的生成系统消息。这对于调试提供给LLM的上下文很有用。",
+          "early_wait_enable": "如果模型响应时间过长，代理将询问您是否要等待。响应将通过通知传递。",
+          "vocabulary_enable": "通过替换同义词来规范化用户输入（例如，'关闭'和'停用'被视为相同）。这可以提高本地意图识别能力。",
+          "log_utterances": "将原始和规范化的用户话语记录到文件中。这对于调试文本规范化过程很有用。",
+          "mcp_enabled": "启用主控制程序（MCP）服务器以维护对话上下文。在第一条消息后仅发送实体状态更改，从而减少令牌使用。",
+          "local_intent_enable": "直接处理简单的命令，如开关灯，而无需调用LLM。这样更快、更便宜。"
         }
       }
     }
