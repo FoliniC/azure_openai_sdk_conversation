@@ -13,6 +13,13 @@
 - **Empty Request Guard**: Added a guard to `async_process` to ignore empty or whitespace-only requests from Home Assistant, preventing unnecessary processing and LLM calls.
 - **Code Quality**: Linted the entire codebase with `ruff` and fixed all reported issues.
 
+### Architectural Changes
+- **Configurable Sliding Window**: Implemented a configurable sliding window for managing request/response history. This provides a balance between context preservation and resource constraints, ensuring recent messages are always available to the LLM while managing memory efficiently with token limits.
+  - User-adjustable window size.
+  - Ability for users to reset the conversation context.
+  - Support for tagged context for different purposes.
+- **Preparation for LangGraph Migration**: The agent logic has been kept in isolated modules, using typed state objects for context and implementing logging hooks for introspection, to facilitate a future migration to LangGraph.
+
 ---
 
 ## 1.0.2 - 2025-11-05
