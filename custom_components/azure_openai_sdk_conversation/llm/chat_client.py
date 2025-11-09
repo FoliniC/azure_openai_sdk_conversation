@@ -417,7 +417,6 @@ class ChatClient:
         import time
 
         text_out = ""
-        tool_calls_list = []
         token_counts = {"prompt": 0, "completion": 0, "total": 0}
         start_time = time.perf_counter()
 

@@ -30,6 +30,7 @@ from ..llm.chat_client import ChatClient
 from ..llm.responses_client import ResponsesClient
 from ..local_intent.local_handler import LocalIntentHandler
 from ..context.system_prompt import SystemPromptBuilder
+from ..context.conversation_memory import ConversationMemoryManager
 from ..stats.manager import StatsManager
 from ..stats.metrics import RequestMetrics
 from .config import AgentConfig
@@ -58,6 +59,20 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         self._responses_client: Optional[ResponsesClient] = None
         self._init_llm_clients()
 
+        # Initialize conversation memory manager (NUOVO)
+        self._memory: Optional[ConversationMemoryManager] = None
+        if getattr(config, "sliding_window_enable", True):
+            self._memory = ConversationMemoryManager(
+                hass=hass,
+                config=config,
+                logger=self._logger,
+            )
+        self._logger.info(
+            "Sliding window enabled: max_tokens=%d, preserve_system=%s",
+            config.sliding_window_max_tokens,
+            config.sliding_window_preserve_system,
+        )
+    
         # Initialize local intent handler
         self._local_handler = LocalIntentHandler(
             hass=hass,
@@ -93,6 +108,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
 
         # Pending requests tracking
         self._pending_requests: dict[str, dict[str, Any]] = {}
+        self._base_tool_tokens_calculated = False
 
         self._logger.info(
             "Agent initialized: model=%s, local_intent=%s, stats=%s, tools=%s",
@@ -101,6 +117,14 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             config.stats_enable,
             config.tools_enable,
         )
+
+    async def async_setup(self) -> None:
+        """Asynchronous setup for the agent."""
+        # Setup memory manager (including tiktoken)
+        if self._memory:
+            await self._memory.async_setup()
+
+        self._logger.debug("Agent asynchronous setup complete.")
 
     def _init_llm_clients(self) -> None:
         """Initialize LLM clients based on configuration."""
@@ -149,6 +173,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         Returns:
             ConversationResult with response
         """
+        # If the input is empty or just whitespace, ignore it.
+        # This prevents unnecessary processing for activation/dummy requests.
+        if not user_input.text or not user_input.text.strip():
+            self._logger.debug("Ignoring empty or whitespace-only user input.")
+            return conversation.ConversationResult(
+                response=intent_helper.IntentResponse(language=user_input.language),
+                conversation_id=user_input.conversation_id,
+            )
+
         # Try to process with the default HA agent first
         agent_manager = conversation.get_agent_manager(self._hass)
         try:
@@ -216,6 +249,15 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 text_raw[:50],
             )
 
+            # NUOVO: Add user message to sliding window
+            if self._memory and conv_id:
+                await self._memory.add_message(
+                    conversation_id=conv_id,
+                    role="user",
+                    content=text_raw,
+                    tags={"input"},
+                )
+            
             # Check for pending continuation
             if conv_id and conv_id in self._pending_requests:
                 return await self._handle_pending_continuation(
@@ -336,22 +378,58 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         if not client:
             raise RuntimeError("No LLM client available")
 
+        # One-time calculation of tool tokens, if needed
+        if self._tool_manager and self._memory and not self._base_tool_tokens_calculated:
+            try:
+                import json
+                import tiktoken
+
+                tool_definitions = await self._tool_manager.get_tools_schema()
+                if tool_definitions:
+                    def count_tool_tokens():
+                        """Synchronous token counting function."""
+                        encoding = tiktoken.get_encoding("cl100k_base")
+                        tools_json = json.dumps(tool_definitions)
+                        return len(encoding.encode(tools_json))
+
+                    tool_token_count = await self._hass.async_add_executor_job(count_tool_tokens)
+                    await self._memory.async_set_base_tool_tokens(tool_token_count)
+                    self._logger.debug("Set base tool token count to: %d", tool_token_count)
+                
+                self._base_tool_tokens_calculated = True
+
+            except (ImportError, Exception) as e:
+                self._logger.warning("Could not calculate and set tool token count: %r", e)
+                # Set to True even on failure to avoid retrying every time
+                self._base_tool_tokens_calculated = True
+
+
         # Update metrics
         metrics.handler = "llm_responses" if use_responses else "llm_chat"
         metrics.model = self._config.chat_model
         metrics.api_version = client.effective_api_version
         metrics.temperature = self._config.temperature
 
-        # Build system prompt
-        system_prompt = await self._prompt_builder.build(
-            conversation_id=conv_id,
-        )
+        # MODIFICATO: Build messages with sliding window
+        if self._memory and conv_id:
+            # Build and set the dynamic system prompt in the memory manager.
+            # This will update the token count and trigger eviction if needed.
+            system_prompt = await self._prompt_builder.build(
+                conversation_id=conv_id,
+            )
+            await self._memory.async_set_system_prompt(conv_id, system_prompt)
 
-        # Build messages
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": normalized_text},
-        ]
+            # Get the final, managed list of messages
+            messages = await self._memory.get_messages(conv_id)
+        else:
+            # Fallback: build messages as before (no sliding window)
+            system_prompt = await self._prompt_builder.build(
+                conversation_id=conv_id,
+            )
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": normalized_text},
+            ]
 
         # Log utterance
         await self._log_utterance(
@@ -413,6 +491,38 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 metrics.completion_tokens = token_counts.get("completion", 0)
                 metrics.total_tokens = token_counts.get("total", 0)
 
+        # NUOVO: Add assistant response to sliding window
+        if self._memory and conv_id:
+            # Extract plain text from the speech response
+            speech_content = result.response.speech
+            if isinstance(speech_content, dict):
+                # It's a rich response, get the plain text part
+                content_to_log = speech_content.get("plain", {}).get("speech", "")
+            elif isinstance(speech_content, str):
+                # It's already a string
+                content_to_log = speech_content
+            else:
+                # Fallback for unknown types
+                content_to_log = str(speech_content)
+
+            await self._memory.add_message(
+                conversation_id=conv_id,
+                role="assistant",
+                content=content_to_log,
+                tags={"output"},
+            )
+            
+            # Log window stats
+            stats = self._memory.get_stats(conv_id)
+            self._logger.debug(
+                "Sliding window stats (v2): conv=%s, msgs=%d, tokens=%d/%d (%.1f%%)",
+                conv_id,
+                stats.get("message_count", 0),
+                stats.get("current_tokens", 0),
+                stats.get("max_tokens", 0),
+                stats.get("utilization", 0.0),
+            )
+
         # Finalize metrics
         metrics.execution_time_ms = (time.perf_counter() - start_time) * 1000
         metrics.response_length = len(result.response.speech)
@@ -421,6 +531,46 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             await self._stats_manager.record_request(metrics)
 
         return result
+
+    # ============================================================================
+    # PARTE 5: Nuovo metodo per reset conversazione
+    # ============================================================================
+    
+    async def async_reset_conversation(self, conversation_id: str) -> None:
+        """
+        Reset conversation history for given conversation ID.
+        
+        Args:
+            conversation_id: Conversation ID to reset
+        """
+        if self._memory:
+            await self._memory.reset_conversation(conversation_id)
+            self._logger.info("Reset conversation: %s", conversation_id)
+        else:
+            self._logger.warning(
+                "Cannot reset conversation: sliding window disabled"
+            )
+    
+    
+    # ============================================================================
+    # PARTE 6: Nuovo metodo per ottenere stats
+    # ============================================================================
+    
+    def get_conversation_stats(self, conversation_id: str) -> dict[str, Any]:
+        """
+        Get statistics for a conversation.
+        
+        Args:
+            conversation_id: Conversation ID
+        
+        Returns:
+            Statistics dict
+        """
+        if self._memory:
+            return self._memory.get_stats(conversation_id)
+        else:
+            return {"error": "Sliding window disabled"}
+    
 
     async def _execute_with_early_timeout(
         self,
@@ -758,5 +908,12 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             await self._prompt_builder.close()
         if self._stats_manager:
             await self._stats_manager.stop()
+        # Cleanup memory manager (NUOVO)
+        if self._memory:
+            # Nessun cleanup specifico necessario (in-memory only)
+            self._logger.info(
+                "Closing memory manager: %d active conversations",
+                len(self._memory.get_all_conversations()),
+            )
 
         self._logger.info("Agent closed")

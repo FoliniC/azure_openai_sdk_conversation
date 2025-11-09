@@ -1,5 +1,27 @@
 # CHANGELOG – Azure OpenAI SDK Conversation
 
+## 1.1.0 - 2025-11-10
+
+### Bug Fixes
+- **Event Loop Blocking**: Fixed multiple blocking calls (`tiktoken`, `httpx`) in the Home Assistant event loop, which were causing `RuntimeError` and `Detected blocking call` warnings.
+- **Sliding Window Token Counting**: Fixed a major bug in the sliding window token counting. The new implementation now correctly accounts for the token count of both the tool definitions and the dynamic system prompt, ensuring the sliding window works as expected.
+- **NameError Resolution**: Resolved several `NameError` exceptions in `llm/responses_client.py` and `context/conversation_memory.py` by adding or restoring missing imports and moving code to the correct scope.
+
+### New Features & Improvements
+- **Configuration Warning**: Added an `ERROR` log message that is displayed when the configured `sliding_window_max_tokens` is too small to fit the initial prompt, guiding the user to fix their configuration.
+- **On-Demand Tool Calculation**: Refactored the tool token calculation to happen on the first real request instead of at startup. This eliminates "ghost" request logs during initialization and improves startup time.
+- **Empty Request Guard**: Added a guard to `async_process` to ignore empty or whitespace-only requests from Home Assistant, preventing unnecessary processing and LLM calls.
+- **Code Quality**: Linted the entire codebase with `ruff` and fixed all reported issues.
+
+### Architectural Changes
+- **Configurable Sliding Window**: Implemented a configurable sliding window for managing request/response history. This provides a balance between context preservation and resource constraints, ensuring recent messages are always available to the LLM while managing memory efficiently with token limits.
+  - User-adjustable window size.
+  - Ability for users to reset the conversation context.
+  - Support for tagged context for different purposes.
+- **Preparation for LangGraph Migration**: The agent logic has been kept in isolated modules, using typed state objects for context and implementing logging hooks for introspection, to facilitate a future migration to LangGraph.
+
+---
+
 ## 1.0.2 - 2025-11-05
 
 ### Features

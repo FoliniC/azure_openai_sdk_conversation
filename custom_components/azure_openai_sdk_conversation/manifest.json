@@ -7,11 +7,12 @@
     "intent"  
   ],  
   "config_flow": true,  
-  "version": "1.0.2",  
+  "version": "1.1.0",  
   "documentation": "https://github.com/FoliniC/azure_openai_sdk_conversation",  
   "issue_tracker": "https://github.com/FoliniC/azure_openai_sdk_conversation/issues",
   "requirements": [  
-    "voluptuous-openapi>=0.0.4"  
+    "voluptuous-openapi>=0.0.4",
+    "tiktoken"  
   ],  
   "codeowners": [  
     "@FoliniC"  

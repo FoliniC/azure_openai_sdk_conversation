@@ -95,6 +95,14 @@ from .const import (
     RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
     CONF_SSL_VERIFY,
     CONF_PAYLOAD_LOG_PATH,
+    # Sliding Window
+    CONF_SLIDING_WINDOW_ENABLE,
+    CONF_SLIDING_WINDOW_MAX_TOKENS,
+    CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+    RECOMMENDED_SLIDING_WINDOW_ENABLE,
+    RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
+    CONF_SLIDING_WINDOW_TOKEN_BUFFER,
+    RECOMMENDED_SLIDING_WINDOW_TOKEN_BUFFER,
 )
 from .utils import APIVersionManager
 
@@ -106,7 +114,7 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
 
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -527,6 +535,61 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ),
             }
         )
+
+        # Sliding Window section
+        schema = schema.extend(
+            {
+                vol.Optional(
+                    CONF_SLIDING_WINDOW_ENABLE,
+                    default=self.config_entry.options.get(
+                        CONF_SLIDING_WINDOW_ENABLE, RECOMMENDED_SLIDING_WINDOW_ENABLE
+                    ),
+                ): BooleanSelector(),
+            }
+        )
+        
+        # Only show additional settings if sliding window is enabled
+        if self.config_entry.options.get(
+            CONF_SLIDING_WINDOW_ENABLE, RECOMMENDED_SLIDING_WINDOW_ENABLE
+        ):
+            schema = schema.extend(
+                {
+                    vol.Optional(
+                        CONF_SLIDING_WINDOW_MAX_TOKENS,
+                        default=self.config_entry.options.get(
+                            CONF_SLIDING_WINDOW_MAX_TOKENS,
+                            RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=1000,
+                            max=16000,
+                            step=500,
+                            mode="box",
+                        )
+                    ),
+                    vol.Optional(
+                        CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+                        default=self.config_entry.options.get(
+                            CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+                        ),
+                    ): BooleanSelector(),
+                    vol.Optional(
+                        CONF_SLIDING_WINDOW_TOKEN_BUFFER,
+                        default=self.config_entry.options.get(
+                            CONF_SLIDING_WINDOW_TOKEN_BUFFER,
+                            RECOMMENDED_SLIDING_WINDOW_TOKEN_BUFFER,
+                        ),
+                    ): NumberSelector(
+                        NumberSelectorConfig(
+                            min=0,
+                            max=1000,
+                            step=50,
+                            mode="box",
+                        )
+                    ),
+                }
+            )
 
         # Tool Calling section
         schema = schema.extend(

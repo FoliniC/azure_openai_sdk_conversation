@@ -102,6 +102,11 @@ class AgentConfig:
     mcp_enabled: bool = True
     mcp_ttl_seconds: int = 3600
 
+    # Sliding Window Configuration
+    sliding_window_enable: bool = True
+    sliding_window_max_tokens: int = 4000
+    sliding_window_preserve_system: bool = True
+
     # Tool Calling
     tools_enable: bool = True
     tools_whitelist: str = "light,switch,climate,cover,fan,media_player,lock,vacuum"
@@ -243,6 +248,10 @@ class AgentConfig:
                 data.get(CONF_PAYLOAD_LOG_PATH),
                 ".storage/azure_openai_payloads.log",
             ),
+            # Sliding Window
+            sliding_window_enable=get_bool("sliding_window_enable", True),
+            sliding_window_max_tokens=get_int("sliding_window_max_tokens", 4000),
+            sliding_window_preserve_system=get_bool("sliding_window_preserve_system", True),
             debug_sse=get_bool("debug_sse", False),
             debug_sse_lines=get_int("debug_sse_lines", 10),
             # Early wait

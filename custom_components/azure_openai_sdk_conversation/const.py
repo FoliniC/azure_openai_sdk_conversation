@@ -93,6 +93,13 @@ TOKEN_COUNTING_HYBRID: Final[str] = "hybrid"
 CONF_MCP_ENABLED: Final[str] = "mcp_enabled"
 CONF_MCP_TTL_SECONDS: Final[str] = "mcp_ttl_seconds"
 
+# Sliding Window Configuration
+CONF_SLIDING_WINDOW_ENABLE: Final[str] = "sliding_window_enable"
+CONF_SLIDING_WINDOW_MAX_TOKENS: Final[str] = "sliding_window_max_tokens"
+CONF_SLIDING_WINDOW_PRESERVE_SYSTEM: Final[str] = "sliding_window_preserve_system"
+CONF_SLIDING_WINDOW_TOKEN_BUFFER: Final[str] = "sliding_window_token_buffer"
+
+
 # Tool Calling Configuration
 CONF_TOOLS_ENABLE: Final[str] = "tools_enable"
 CONF_TOOLS_WHITELIST: Final[str] = "tools_whitelist"
@@ -109,7 +116,7 @@ RECOMMENDED_TOOLS_MAX_ITERATIONS: Final[int] = 5
 RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE: Final[int] = 30
 RECOMMENDED_TOOLS_PARALLEL_EXECUTION: Final[bool] = False
 
-# Prici<ng and alerts
+# Pricing and alerts
 CONF_CUSTOM_PRICING: Final[str] = "custom_pricing"
 CONF_ALERT_ERROR_RATE: Final[str] = "alert_error_rate_percentage"
 CONF_ALERT_COST_DAILY: Final[str] = "alert_cost_daily_usd"
@@ -167,6 +174,12 @@ RECOMMENDED_TOKEN_COUNTING_MODE: Final[str] = TOKEN_COUNTING_HYBRID
 
 RECOMMENDED_MCP_ENABLED: Final[bool] = True
 RECOMMENDED_MCP_TTL_SECONDS: Final[int] = 3600
+
+# Defaults
+RECOMMENDED_SLIDING_WINDOW_ENABLE: Final[bool] = True
+RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS: Final[int] = 4000
+RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM: Final[bool] = True
+RECOMMENDED_SLIDING_WINDOW_TOKEN_BUFFER: Final[int] = 200
 
 RECOMMENDED_ALERT_ERROR_RATE: Final[float] = 5.0
 RECOMMENDED_ALERT_COST_DAILY: Final[float] = 5.0
@@ -288,4 +301,12 @@ __all__ = [
     "RECOMMENDED_TOOLS_MAX_ITERATIONS",
     "RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE",
     "RECOMMENDED_TOOLS_PARALLEL_EXECUTION",
+    "CONF_SLIDING_WINDOW_ENABLE",
+    "CONF_SLIDING_WINDOW_MAX_TOKENS",
+    "CONF_SLIDING_WINDOW_PRESERVE_SYSTEM",
+    "CONF_SLIDING_WINDOW_TOKEN_BUFFER",
+    "RECOMMENDED_SLIDING_WINDOW_ENABLE",
+    "RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS",
+    "RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM",
+    "RECOMMENDED_SLIDING_WINDOW_TOKEN_BUFFER",
 ]

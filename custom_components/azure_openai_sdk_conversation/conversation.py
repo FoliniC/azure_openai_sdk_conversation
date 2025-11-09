@@ -74,6 +74,7 @@ async def async_setup_entry(
     # Create agent
     try:
         agent = AzureOpenAIConversationAgent(hass, config)
+        await agent.async_setup()
     except Exception as err:
         _LOGGER.error("Failed to create conversation agent: %r", err)
         return False

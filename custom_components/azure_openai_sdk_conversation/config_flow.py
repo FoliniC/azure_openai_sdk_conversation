@@ -85,6 +85,13 @@ from .const import (
     RECOMMENDED_TOOLS_MAX_ITERATIONS,
     RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
     RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
+    CONF_SLIDING_WINDOW_ENABLE,
+    CONF_SLIDING_WINDOW_MAX_TOKENS,
+    CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+    RECOMMENDED_SLIDING_WINDOW_ENABLE,
+    RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
+    RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
+
 )
 from .utils import AzureOpenAIValidator
 
@@ -293,6 +300,43 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         ] = NumberSelector(
             NumberSelectorConfig(min=300, max=7200, step=300, mode="box")
         )
+        
+        # Sliding Window Configuration
+        cap_schema[
+            vol.Optional(
+                CONF_SLIDING_WINDOW_ENABLE, 
+                default=RECOMMENDED_SLIDING_WINDOW_ENABLE
+            )
+        ] = BooleanSelector()
+        
+        # Only show additional options if sliding window is enabled
+        if user_input and user_input.get(CONF_SLIDING_WINDOW_ENABLE, True):
+            cap_schema[
+                vol.Optional(
+                    CONF_SLIDING_WINDOW_MAX_TOKENS,
+                    default=self.config_entry.options.get(
+                        CONF_SLIDING_WINDOW_MAX_TOKENS,
+                        RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
+                    ),
+                )
+            ] = NumberSelector(
+                NumberSelectorConfig(
+                    min=1000,
+                    max=16000,
+                    step=500,
+                    mode="box",
+                )
+            )
+        cap_schema[
+            vol.Optional(
+                CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+                default=self.config_entry.options.get(
+                    CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
+                    RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
+                ),
+            )
+        ] = BooleanSelector()
+
 
         if not cap_schema:
             # nothing extra to ask
@@ -405,6 +449,10 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
             CONF_TOOLS_MAX_ITERATIONS: RECOMMENDED_TOOLS_MAX_ITERATIONS,
             CONF_TOOLS_MAX_CALLS_PER_MINUTE: RECOMMENDED_TOOLS_MAX_CALLS_PER_MINUTE,
             CONF_TOOLS_PARALLEL_EXECUTION: RECOMMENDED_TOOLS_PARALLEL_EXECUTION,
+            # Sliding Window defaults
+            CONF_SLIDING_WINDOW_ENABLE: RECOMMENDED_SLIDING_WINDOW_ENABLE,
+            CONF_SLIDING_WINDOW_MAX_TOKENS: RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
+            CONF_SLIDING_WINDOW_PRESERVE_SYSTEM: RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
         }
         base_opts.update(options)
 

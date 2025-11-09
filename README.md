@@ -22,6 +22,7 @@ This custom integration adds a conversation agent powered by Azure OpenAI in Hom
 *   **History**: Stores prompt history.
 *   **Web Search**: Optional Bing search integration for real-time information.
 *   **Flexible Configuration**: Configure and modify endpoint, model, and max tokens in the options UI.
+*   **Configurable Sliding Window**: Implemented a configurable sliding window for managing request/response history. This provides a balance between context preservation and resource constraints, ensuring recent messages are always available to the LLM while managing memory efficiently with token limits. It includes user-adjustable window size, ability to reset the conversation context, and support for tagged context for different purposes.
 *   **General Stability & Bug Fixes**: Numerous improvements for a more stable and reliable experience.
 
 ## Architecture: The MCP Server
@@ -160,6 +161,20 @@ A: This feature helps the agent understand your commands more reliably, especial
 **Q: What is the "MCP server"?**
 
 A: MCP (Master Control Program) is an optional background server that creates stateful conversations. Normally, every message includes the full context of all your devices. With MCP enabled, after the first message, the agent only sends the *changes* in device states. This significantly reduces the tokens sent to the language model, making conversations faster and cheaper, especially in homes with many devices.
+
+## Troubleshooting
+
+**ERROR: Sliding window max_tokens is too small**
+
+If you see an error in your Home Assistant logs like:
+`ERROR (MainThread) [custom_components.azure_openai_sdk_conversation.core.logger] Sliding window max_tokens (1000) is too small to fit the initial prompt... Current initial prompt size: 1057 tokens.`
+
+This means that the initial prompt, which includes your system message and the definitions for any available tools (functions), is larger than the configured `sliding_window_max_tokens`.
+
+**To fix this:**
+1. Go to **Settings > Devices & Services > Azure OpenAI SDK Conversation**.
+2. Click **Configure** on your agent instance.
+3. Increase the value of **Sliding window max tokens** to be larger than the "Current initial prompt size" reported in the error message. A safe value would be the reported size plus at least 500-1000 tokens to leave room for the actual conversation.
 
 ## Tested Models
 - gpt-5

@@ -1,10 +1,3 @@
-"""
-Client for Azure OpenAI Responses API (o-series models).
-
-Wraps httpx to handle streaming, authentication, and error handling for
-models that use the older "Responses" API format (e.g., o-gpt-4).
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -13,6 +6,7 @@ from typing import Any, Optional
 
 import httpx
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.httpx_client import get_async_client
 
 from ..core.config import AgentConfig
 from ..core.logger import AgentLogger
@@ -34,19 +28,15 @@ class ResponsesClient:
         # API version is determined by config, with a fallback for safety
         self.effective_api_version = config.api_version or "2024-02-15-preview"
 
-        # Prepare headers
-        headers = {
+        # Store base URL and headers for requests
+        self._base_url = f"{config.api_base}/openai/deployments/{config.chat_model}"
+        self._headers = {
             "Content-Type": "application/json",
             "api-key": config.api_key,
         }
 
-        # Prepare HTTP client
-        self._http = httpx.AsyncClient(
-            base_url=f"{config.api_base}/openai/deployments/{config.chat_model}",
-            headers=headers,
-            timeout=config.api_timeout,
-            verify=config.ssl_verify,
-        )
+        # Prepare HTTP client using HA's shared client
+        self._http = get_async_client(self._hass, verify_ssl=config.ssl_verify)
 
     async def complete(
         self,
@@ -128,8 +118,9 @@ class ResponsesClient:
         try:
             async with self._http.stream(
                 "POST",
-                url="/chat/completions",
+                url=f"{self._base_url}/chat/completions",
                 params={"api-version": self.effective_api_version},
+                headers=self._headers,
                 json=payload,
             ) as resp:
                 resp.raise_for_status()
@@ -191,8 +182,9 @@ class ResponsesClient:
         try:
             async with self._http.stream(
                 "POST",
-                url="/chat/completions",
+                url=f"{self._base_url}/chat/completions",
                 params={"api-version": self.effective_api_version},
+                headers=self._headers,
                 json=payload,
             ) as resp:
                 resp.raise_for_status()
@@ -237,4 +229,5 @@ class ResponsesClient:
 
     async def close(self) -> None:
         """Close the HTTP client."""
-        await self._http.aclose()
+        # The client is managed by HA, no need to close it here.
+        pass
