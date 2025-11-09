@@ -22,6 +22,7 @@ This custom integration adds a conversation agent powered by Azure OpenAI in Hom
 *   **History**: Stores prompt history.
 *   **Web Search**: Optional Bing search integration for real-time information.
 *   **Flexible Configuration**: Configure and modify endpoint, model, and max tokens in the options UI.
+*   **Configurable Sliding Window**: Implemented a configurable sliding window for managing request/response history. This provides a balance between context preservation and resource constraints, ensuring recent messages are always available to the LLM while managing memory efficiently with token limits. It includes user-adjustable window size, ability to reset the conversation context, and support for tagged context for different purposes.
 *   **General Stability & Bug Fixes**: Numerous improvements for a more stable and reliable experience.
 
 ## Architecture: The MCP Server
