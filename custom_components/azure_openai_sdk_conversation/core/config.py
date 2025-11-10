@@ -251,7 +251,9 @@ class AgentConfig:
             # Sliding Window
             sliding_window_enable=get_bool("sliding_window_enable", True),
             sliding_window_max_tokens=get_int("sliding_window_max_tokens", 4000),
-            sliding_window_preserve_system=get_bool("sliding_window_preserve_system", True),
+            sliding_window_preserve_system=get_bool(
+                "sliding_window_preserve_system", True
+            ),
             debug_sse=get_bool("debug_sse", False),
             debug_sse_lines=get_int("debug_sse_lines", 10),
             # Early wait

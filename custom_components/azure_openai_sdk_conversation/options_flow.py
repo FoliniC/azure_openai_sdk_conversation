@@ -115,7 +115,6 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
     def __init__(self, config_entry: ConfigEntry) -> None:
         """Initialize options flow."""
 
-
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -547,7 +546,7 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 ): BooleanSelector(),
             }
         )
-        
+
         # Only show additional settings if sliding window is enabled
         if self.config_entry.options.get(
             CONF_SLIDING_WINDOW_ENABLE, RECOMMENDED_SLIDING_WINDOW_ENABLE

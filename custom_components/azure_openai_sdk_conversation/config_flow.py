@@ -91,7 +91,6 @@ from .const import (
     RECOMMENDED_SLIDING_WINDOW_ENABLE,
     RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
     RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
-
 )
 from .utils import AzureOpenAIValidator
 
@@ -300,15 +299,14 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         ] = NumberSelector(
             NumberSelectorConfig(min=300, max=7200, step=300, mode="box")
         )
-        
+
         # Sliding Window Configuration
         cap_schema[
             vol.Optional(
-                CONF_SLIDING_WINDOW_ENABLE, 
-                default=RECOMMENDED_SLIDING_WINDOW_ENABLE
+                CONF_SLIDING_WINDOW_ENABLE, default=RECOMMENDED_SLIDING_WINDOW_ENABLE
             )
         ] = BooleanSelector()
-        
+
         # Only show additional options if sliding window is enabled
         if user_input and user_input.get(CONF_SLIDING_WINDOW_ENABLE, True):
             cap_schema[
@@ -336,7 +334,6 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
                 ),
             )
         ] = BooleanSelector()
-
 
         if not cap_schema:
             # nothing extra to ask
