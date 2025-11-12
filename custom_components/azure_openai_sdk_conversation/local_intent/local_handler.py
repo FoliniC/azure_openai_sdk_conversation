@@ -1,4 +1,4 @@
-"""
+﻿"""
 Local intent handler for simple commands (turn_on/turn_off).
 
 Handles common home automation commands locally without LLM,
@@ -209,7 +209,7 @@ class LocalIntentHandler:
             "a",
         }
 
-        raw_tokens = re.findall(r"[a-zàèéìòóù]+", rest)
+        raw_tokens = re.findall(r"[a-zÃ Ã¨Ã©Ã¬Ã²Ã³Ã¹]+", rest)
 
         # Filter tokens
         tokens = []
@@ -306,7 +306,7 @@ class LocalIntentHandler:
 
         if not results:
             if is_italian:
-                return "Non ho trovato alcuna entità corrispondente da controllare."
+                return "Non ho trovato alcuna entitÃ  corrispondente da controllare."
             return "I couldn't find any matching entities to control."
 
         # Build lines for each entity

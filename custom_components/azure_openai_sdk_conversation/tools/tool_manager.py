@@ -1,4 +1,4 @@
-"""
+﻿"""
 Tool Manager - orchestrates tool calling workflow.
 
 Coordinates schema building, validation, and execution of function calls.

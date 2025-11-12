@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/options_flow.py
 """Options flow for Azure OpenAI SDK Conversation."""
 

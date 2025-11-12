@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+﻿<<<<<<< HEAD
 """
 Token counting and estimation for Azure OpenAI models.
 
@@ -117,7 +117,7 @@ class TokenCounter:
 
         # Count different character types
         ascii_chars = sum(1 for c in text if ord(c) < 128)
-        accented_chars = sum(1 for c in text if "à" <= c <= "ù" or "À" <= c <= "Ù")
+        accented_chars = sum(1 for c in text if "Ã " <= c <= "Ã¹" or "Ã€" <= c <= "Ã™")
         code_indicators = sum(1 for c in text if c in "{}[]();=<>")
 
         total = len(text)
@@ -285,7 +285,7 @@ class TokenCounter:
 
         # Count different character types
         ascii_chars = sum(1 for c in text if ord(c) < 128)
-        accented_chars = sum(1 for c in text if "à" <= c <= "ù" or "À" <= c <= "Ù")
+        accented_chars = sum(1 for c in text if "Ã " <= c <= "Ã¹" or "Ã€" <= c <= "Ã™")
         code_indicators = sum(1 for c in text if c in "{}[]();=<>")
 
         total = len(text)

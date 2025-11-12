@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+﻿<<<<<<< HEAD
 """
 Text normalization with vocabulary/synonym support.
 

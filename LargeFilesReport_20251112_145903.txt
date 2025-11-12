@@ -1,0 +1,275 @@
+=====================================================
+REPORT ANALISI SPAZIO SU DISCO (v5 - ASCII PURO)
+Data: 2025-11-12 16:40:20
+Percorso: C:\
+=====================================================
+
+INFORMAZIONI DISCO:
+-----------------------------------------------------
+Drive: C:
+Capacita totale: 230,56 GB
+Spazio usato: 229,94 GB (99.73 %)
+Spazio libero: 634,39 MB
+
+TOP 20 CARTELLE PIU GRANDI:
+-----------------------------------------------------
+1. Users - 750,63 GB (326.4 %)
+   Path: C:\Users
+
+2. Program Files - 43,15 GB (18.8 %)
+   Path: C:\Program Files
+
+3. Windows - 29,42 GB (12.8 %)
+   Path: C:\Windows
+
+4. Program Files (x86) - 12,80 GB (5.6 %)
+   Path: C:\Program Files (x86)
+
+5. Programs - 11,98 GB (5.2 %)
+   Path: C:\Programs
+
+6. ACCA - 1,38 GB (0.6 %)
+   Path: C:\ACCA
+
+7. Downloads - 761,96 MB (0.3 %)
+   Path: C:\Downloads
+
+8. temp - 647,53 MB (0.3 %)
+   Path: C:\temp
+
+9. Download - 331,31 MB (0.1 %)
+   Path: C:\Download
+
+10. grub2 - 27,38 MB (0 %)
+   Path: C:\grub2
+
+11. ODT - 10,66 MB (0 %)
+   Path: C:\ODT
+
+12. SWSetup - 5,86 MB (0 %)
+   Path: C:\SWSetup
+
+13. WCH.CN - 505,51 KB (0 %)
+   Path: C:\WCH.CN
+
+14. ventoy - 454,86 KB (0 %)
+   Path: C:\ventoy
+
+15. CPM - 300,85 KB (0 %)
+   Path: C:\CPM
+
+16. Dell - 5,74 KB (0 %)
+   Path: C:\Dell
+
+17. OEM - 931 bytes (0 %)
+   Path: C:\OEM
+
+18. boot - 376 bytes (0 %)
+   Path: C:\boot
+
+FILE INDIVIDUALI GRANDI (> 1,00 GB):
+-----------------------------------------------------
+1. takeoutBrunaGmail-20230822T092723Z-001.zip - 16,34 GB (7.11 %)
+   Path: C:\Users\carlo_2\OneDrive - Il viale della Formica\Dati\BackupBruna\takeoutBrunaGmail-20230822T092723Z-001.zip
+   Modificato: 08/22/2023 14:37:30
+
+2. 20110326203649.m2ts - 14,54 GB (6.32 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\20110326203649.m2ts
+   Modificato: 03/27/2011 00:40:13
+
+3. 20110314203743.m2ts - 13,95 GB (6.07 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\NonnaFabio\20110314203743.m2ts
+   Modificato: 03/20/2011 22:54:46
+
+4. 20110406193446.m2ts - 13,79 GB (6 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\2011-04-06 Marianina\20110406193446.m2ts
+   Modificato: 04/06/2011 22:48:57
+
+5. Tutti i messaggi compresi Spam e Cestino.mbox - 12,85 GB (5.59 %)
+   Path: C:\Users\carlo_2\OneDrive - Il viale della Formica\Takeout\Mail\Tutti i messaggi compresi Spam e Cestino.mbox
+   Modificato: 07/31/2021 05:49:52
+
+6. 20110425195514.m2ts - 12,80 GB (5.56 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Zia Marzia 2011-04-25\20110425195514.m2ts
+   Modificato: 04/25/2011 23:12:21
+
+7. 20110409160553.m2ts - 11,70 GB (5.09 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Patusc 2011-04-09\20110409160553.m2ts
+   Modificato: 04/09/2011 20:33:20
+
+8. Il ragazzo e l'airone (2023) [WEB-DL.2160p.DV.HDR.EAC-3.ITA.JPN.Subs.Ita.Eng.v0] by stress.mkv - 11,61 GB (5.05 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\junk\Il ragazzo e l'airone (2023) [WEB-DL.2160p.DV.HDR.EAC-3.ITA.JPN.Subs.Ita.Eng.v0] by stress.mkv
+   Modificato: 12/20/2024 21:21:42
+
+9. 20110214210129.m2ts - 9,48 GB (4.12 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\14-02-2011 Corrado\20110214210129.m2ts
+   Modificato: 02/14/2011 23:42:56
+
+10. 20110207211130.m2ts - 7,82 GB (3.4 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\GenitoriBarbara\20110207211130.m2ts
+   Modificato: 02/14/2011 20:07:11
+
+11. Joint Item1-AVI - Audio-Video Interleaved.avi - 7,15 GB (3.11 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\[DvD5 Ita]Viaggio.Nella.Preistoria(1)(Piero.Alberto.Angela)-LiFE\Full Video Converter Free\Joint Item1-AVI - Audio-Video Interleaved.avi
+   Modificato: 11/26/2011 22:26:24
+
+12. Win11_25H2_Italian_x64.iso - 7,12 GB (3.1 %)
+   Path: C:\Users\carlo_2\Downloads\Win11_25H2_Italian_x64.iso
+   Modificato: 10/23/2025 23:42:53
+
+13. 20110304210114.m2ts - 7,09 GB (3.08 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Sbrega\20110304210114.m2ts
+   Modificato: 03/05/2011 00:27:51
+
+14. 20110304215243.m2ts - 6,67 GB (2.9 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Sbrega\20110304215243.m2ts
+   Modificato: 03/05/2011 00:42:43
+
+15. 20110528093931 (1).m2ts - 6,59 GB (2.87 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Murales\20110528093931 (1).m2ts
+   Modificato: 06/11/2011 21:26:07
+
+16. 20110528093931.m2ts - 6,59 GB (2.87 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Murales\20110528093931.m2ts
+   Modificato: 05/31/2011 08:28:20
+
+17. Flow.2024.1080p.AMZN.WEB-DL.DDP5.1.H.264-FLUX.mkv - 6,01 GB (2.61 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\Download\Flow.2024.1080p.AMZN.WEB-DL.DDP5.1.H.264-FLUX.mkv
+   Modificato: 01/25/2025 12:15:30
+
+18. 20110324213128.m2ts - 5,72 GB (2.49 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\Prove\20110324213128.m2ts
+   Modificato: 03/26/2011 19:51:39
+
+19. 20110326221829.m2ts - 5,18 GB (2.25 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\20110326221829.m2ts
+   Modificato: 03/26/2011 23:11:13
+
+20. garnet_eea_global-ota_full-OS2.0.4.0.VNREUXM-user-15.0-9cc0c36a24 (1).zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\garnet_eea_global-ota_full-OS2.0.4.0.VNREUXM-user-15.0-9cc0c36a24 (1).zip
+   Modificato: 02/13/2025 13:38:56
+
+21. garnet_eea_global-ota_full-OS2.0.3.0.VNREUXM-user-15.0-d71b530b64.zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\junk\garnet_eea_global-ota_full-OS2.0.3.0.VNREUXM-user-15.0-d71b530b64.zip
+   Modificato: 01/26/2025 19:04:18
+
+22. update.zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\junk\update.zip
+   Modificato: 01/22/2025 12:33:38
+
+23. garnet_eea_global-ota_full-OS2.0.3.0.VNREUXM-user-15.0-d71b530b64.zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\garnet_eea_global-ota_full-OS2.0.3.0.VNREUXM-user-15.0-d71b530b64.zip
+   Modificato: 02/19/2025 09:42:37
+
+24. miui_GARNETEEAGlobal_OS1.0.22.0.UNREUXM_5a07878481_14.0.zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\Download\miui_GARNETEEAGlobal_OS1.0.22.0.UNREUXM_5a07878481_14.0.zip
+   Modificato: 01/26/2025 19:04:18
+
+25. garnet_eea_global-ota_full-OS2.0.2.0.VNREUXM-user-15.0-2bd747b947.zip - 5,06 GB (2.2 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\junk\garnet_eea_global-ota_full-OS2.0.2.0.VNREUXM-user-15.0-2bd747b947.zip
+   Modificato: 01/22/2025 09:16:26
+
+26. Immagini.zip - 4,90 GB (2.13 %)
+   Path: C:\Users\carlo_2\OneDrive - Il viale della Formica\Dati\BackupBruna\Immagini.zip
+   Modificato: 08/24/2023 19:15:01
+
+27. Windows10Italian.iso - 4,51 GB (1.96 %)
+   Path: C:\Users\carlo_2\OneDrive - Il viale della Formica\temp\Windows10Italian.iso
+   Modificato: 12/19/2024 11:18:05
+
+28. Windows10English.iso - 4,51 GB (1.96 %)
+   Path: C:\Users\carlo_2\OneDrive - Il viale della Formica\temp\Windows10English.iso
+   Modificato: 12/19/2024 10:29:49
+
+29. studiosequence (2)03.m2v - 3,86 GB (1.68 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\Montaggio\Render\GITAMINITALIA E6640137\DVD\StudioSequence\temp\studiosequence (2)03.m2v
+   Modificato: 04/07/2011 01:48:57
+
+30. PassiDiMemoriaPrimaveraBerbenBio2018H264.mp4 - 3,74 GB (1.63 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Temp\PassiDiMemoriaPrimaveraBerbenBio2018H264.mp4
+   Modificato: 03/11/2018 23:17:31
+
+31. TeatroVignaConTitolo.wmv - 3,69 GB (1.6 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroVigna\TeatroVignaConTitolo.wmv
+   Modificato: 04/26/2013 06:29:45
+
+32. TeatroVigna.wmv - 3,69 GB (1.6 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroVigna\TeatroVigna.wmv
+   Modificato: 04/24/2013 07:36:28
+
+33. Tonino_L_Invisibile.bin - 3,65 GB (1.59 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Tonino_L_Invisibile.bin
+   Modificato: 08/12/2011 17:27:00
+
+34. Zorin-OS-17.3-Core-64-bit.iso - 3,41 GB (1.48 %)
+   Path: C:\Users\carlo_2\CrossDevice\Redmi Note 13 Pro 5G (2)\storage\Download\Zorin-OS-17.3-Core-64-bit.iso
+   Modificato: 04/03/2025 17:17:57
+
+35. 635195522645295036.mov - 3,39 GB (1.47 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\MostraPassiDiMemoria\FilmatoCompleto\635195522645295036.mov
+   Modificato: 11/09/2013 02:42:06
+
+36. 20110706174201.m2ts - 3,38 GB (1.47 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Cugn 2011-07-07\20110706174201.m2ts
+   Modificato: 07/08/2011 19:59:58
+
+37. studiosequence (1)03.m2v - 3,17 GB (1.38 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\Montaggio\Render\GITAMINITALIA E6640137\DVD\StudioSequence\temp\studiosequence (1)03.m2v
+   Modificato: 04/06/2011 08:24:32
+
+38. 20110304224107.m2ts - 3,15 GB (1.37 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Sbrega\20110304224107.m2ts
+   Modificato: 03/04/2011 23:47:59
+
+39. 20110806134919.m2ts - 3,06 GB (1.33 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\AratroLavatoioFilatura 2011-08-06\20110806134919.m2ts
+   Modificato: 08/06/2011 18:57:15
+
+40. Tonino l'invisibile.iso - 2,97 GB (1.29 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Tonino l'invisibile.iso
+   Modificato: 02/06/2010 08:50:04
+
+41. 20110610165146.m2ts - 2,83 GB (1.23 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Murales\20110610165146.m2ts
+   Modificato: 06/11/2011 21:32:32
+
+42. Expo_2015.mp4 - 2,71 GB (1.18 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Copia da PC Barbara\Expo_2015.mp4
+   Modificato: 08/13/2015 09:40:26
+
+43. system.img - 2,70 GB (1.17 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\GoogleDrive\Junk\K6000\OUKITEL_K6000_Plus_V23_20170726\system.img
+   Modificato: 04/19/2018 17:49:30
+
+44. 636466384532482195.mp4 - 2,63 GB (1.14 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Copia da PC Barbara\Pinnacle\Progetti Studio\636466384532482195.mp4
+   Modificato: 11/18/2017 22:08:47
+
+45. 20110731101902.m2ts - 2,41 GB (1.05 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\31-07-2011 Ranz\20110731101902.m2ts
+   Modificato: 07/31/2011 23:09:58
+
+46. Autunno.mpg - 2,17 GB (0.94 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\MostraPassiDiMemoria\Autunno.mpg
+   Modificato: 09/10/2011 19:40:33
+
+47. 20110313154223.m2ts - 2,12 GB (0.92 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\GenitoriBarbara\Carnevale\20110313154223.m2ts
+   Modificato: 03/13/2011 19:51:19
+
+48. 20110506100130.m2ts - 2,02 GB (0.88 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\Murales\20110506100130.m2ts
+   Modificato: 05/16/2011 19:28:40
+
+49. 00003.MTS - 1,98 GB (0.86 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\00003.MTS
+   Modificato: 03/26/2011 21:14:54
+
+50. 00007.MTS - 1,98 GB (0.86 %)
+   Path: C:\Users\carlo_2\info@VialeFormica.org OneDrive\OneDrive - Il viale della Formica\Documenti\IlVialeBackup\TeatroEtto\00007.MTS
+   Modificato: 03/26/2011 22:05:34
+
+=====================================================
+Tempo scansione: 
+Dimensioni in spazio reale allocato su disco
+=====================================================

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Function executor with safety checks for Azure OpenAI SDK Conversation.
 
 Handles secure execution of Home Assistant service calls from LLM tool calls.

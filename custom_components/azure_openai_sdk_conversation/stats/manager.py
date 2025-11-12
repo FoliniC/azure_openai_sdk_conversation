@@ -1,4 +1,4 @@
-"""
+﻿"""
 Advanced statistics manager for Azure OpenAI SDK Conversation.
 
 Tracks:

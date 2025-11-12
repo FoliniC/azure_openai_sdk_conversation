@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+﻿<<<<<<< HEAD
 # File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/search.py
 """Web search client module for Azure OpenAI conversation."""
 
