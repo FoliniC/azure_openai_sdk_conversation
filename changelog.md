@@ -1,5 +1,18 @@
 # CHANGELOG – Azure OpenAI SDK Conversation
 
+## 1.2.0 - 2025-11-12
+
+### New Features & Improvements
+- **Development Script (`ProxyChiamataProgrammaConLog.bat`):**
+  - Refactored the script to handle both 2-way `diff` and 3-way `merge` operations.
+  - The script now determines the operation type based on the number of arguments passed, making it a versatile proxy for both `git difftool` and `git mergetool`.
+  - Improved error handling to provide clearer messages for incorrect invocations, including a compatibility mode for non-standard calls from the VS Code UI.
+- **VS Code Configuration (`settings.json`):**
+  - Updated Git integration settings to correctly and separately configure `meld` and `winmerge` as external tools for `difftool` and `mergetool`.
+  - The `mergetool` configuration now correctly uses the proxy script to retain logging capabilities, while `difftool` calls the tool directly for stability.
+
+---
+
 ## 1.1.0 - 2025-11-10
 
 ### Bug Fixes
