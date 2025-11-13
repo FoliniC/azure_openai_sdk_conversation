@@ -1,4 +1,4 @@
-﻿"""
+"""
 Unit tests for ConversationMemoryManager.
 
 Run with: pytest tests/test_conversation_memory.py -v

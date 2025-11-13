@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Advanced statistics analyzer for Azure OpenAI Conversation component.
 

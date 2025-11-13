@@ -1,4 +1,4 @@
-﻿"""
+"""
 Entity collector for conversation context.
 
 Collects exposed entities from Home Assistant with their state,

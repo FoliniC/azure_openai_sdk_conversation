@@ -1,4 +1,3 @@
-﻿<<<<<<< HEAD
 """
 Typed state objects for agent execution.
 

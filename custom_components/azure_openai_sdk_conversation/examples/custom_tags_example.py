@@ -1,4 +1,4 @@
-﻿"""
+"""
 Example: Using custom tags in ConversationMemoryManager.
 
 This example shows how to use tags to mark and filter messages
@@ -52,7 +52,7 @@ async def example_custom_tags(memory_manager: ConversationMemoryManager):
     await memory_manager.add_message(
         conversation_id=conv_id,
         role="assistant",
-        content="It's sunny with a high of 75Â°F.",
+        content="It's sunny with a high of 75°F.",
         tags={"output", "information", "context:weather"},
     )
     
@@ -145,7 +145,7 @@ async def example_important_messages(memory_manager: ConversationMemoryManager):
     await memory_manager.add_message(
         conversation_id=conv_id,
         role="assistant",
-        content="La risposta Ã¨ 4.",
+        content="La risposta è 4.",
         tags={"output"},
     )
     

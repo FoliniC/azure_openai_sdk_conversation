@@ -1,4 +1,4 @@
-﻿"""
+"""
 System prompt builder with MCP integration.
 
 Builds system prompts with entity state information, using either:

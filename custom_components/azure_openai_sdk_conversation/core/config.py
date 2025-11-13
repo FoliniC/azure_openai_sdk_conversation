@@ -1,4 +1,4 @@
-﻿"""
+"""
 Agent configuration management.
 
 Centralizes all configuration access and provides type-safe getters.
@@ -175,7 +175,7 @@ class AgentConfig:
                 return val != 0
             if isinstance(val, str):
                 v = val.strip().lower()
-                if v in ("1", "true", "on", "yes", "y", "si", "s", "sÃ¬"):
+                if v in ("1", "true", "on", "yes", "y", "si", "s", "sì"):
                     return True
                 if v in ("0", "false", "off", "no", "n"):
                     return False

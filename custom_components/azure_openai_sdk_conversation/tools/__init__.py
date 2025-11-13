@@ -1,4 +1,4 @@
-﻿"""
+"""
 Tool calling modules for Azure OpenAI SDK Conversation.
 
 Provides Home Assistant function calling capabilities:

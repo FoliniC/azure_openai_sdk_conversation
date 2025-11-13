@@ -1,4 +1,4 @@
-﻿"""Init for Azure OpenAI SDK Conversation integration."""
+"""Init for Azure OpenAI SDK Conversation integration."""
 
 from __future__ import annotations
 

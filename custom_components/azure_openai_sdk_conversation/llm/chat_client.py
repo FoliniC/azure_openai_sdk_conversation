@@ -1,4 +1,4 @@
-﻿"""
+"""
 Chat Completions API client for Azure OpenAI.
 
 Handles:
@@ -171,7 +171,7 @@ class ChatClient:
                 return text_out, token_counts
 
             except httpx.HTTPStatusError as err:
-                # âœ… CORREZIONE: Leggi il body della risposta correttamente
+                # ✅ CORREZIONE: Leggi il body della risposta correttamente
                 try:
                     # The response body should have been read in _stream_completion
                     error_text = err.response.content.decode("utf-8", errors="ignore")
@@ -244,7 +244,7 @@ class ChatClient:
                 await resp.aread()
                 resp.raise_for_status()
 
-            # âœ… CORRECTED: Collect ALL SSE lines before parsing
+            # ✅ CORRECTED: Collect ALL SSE lines before parsing
             lines = []
             first_chunk = True
 
@@ -262,7 +262,7 @@ class ChatClient:
             )
             # --- END: Log raw SSE response ---
 
-            # âœ… CORRECTED: Pass list to parser (not async generator)
+            # ✅ CORRECTED: Pass list to parser (not async generator)
             text_out, _, token_counts = self._parser.parse_stream(lines)
 
             # If no token counts from usage, estimate
@@ -358,7 +358,7 @@ class ChatClient:
                 return response_dict, token_counts
 
             except httpx.HTTPStatusError as err:
-                # âœ… CORREZIONE: Leggi il body della risposta correttamente
+                # ✅ CORREZIONE: Leggi il body della risposta correttamente
                 try:
                     # The response body should have been read in _stream_completion_with_tools
                     error_text = err.response.content.decode("utf-8", errors="ignore")
@@ -433,7 +433,7 @@ class ChatClient:
                 await resp.aread()
                 resp.raise_for_status()
 
-            # âœ… CORRECTED: Collect ALL SSE lines before parsing
+            # ✅ CORRECTED: Collect ALL SSE lines before parsing
             lines = []
             first_chunk = True
 
@@ -451,7 +451,7 @@ class ChatClient:
             )
             # --- END: Log raw SSE response ---
 
-            # âœ… CORRECTED: Pass list to parser and get complete tool calls
+            # ✅ CORRECTED: Pass list to parser and get complete tool calls
             text_out, tool_calls_list, token_counts = self._parser.parse_stream(lines)
 
             # Log SSE collection if configured

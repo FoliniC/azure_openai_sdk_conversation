@@ -1,4 +1,4 @@
-﻿"""
+"""
 Dataclasses for statistics metrics.
 
 Defines the data structures for tracking request-level and aggregated statistics.

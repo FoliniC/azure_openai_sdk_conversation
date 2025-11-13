@@ -1,4 +1,4 @@
-﻿"""Utility helpers for API versions and token parameter selection."""
+"""Utility helpers for API versions and token parameter selection."""
 
 from __future__ import annotations
 

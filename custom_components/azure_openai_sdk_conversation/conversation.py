@@ -1,4 +1,4 @@
-﻿"""
+"""
 Conversation platform setup for Azure OpenAI SDK integration.
 
 This is the entry point called by Home Assistant to set up the conversation

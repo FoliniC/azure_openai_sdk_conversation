@@ -1,4 +1,4 @@
-﻿"""
+"""
 Core conversation agent implementation.
 
 Responsibilities:
@@ -886,7 +886,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
     def _get_task_failed_message(language: Optional[str]) -> str:
         """Get message for when a background task fails."""
         if (language or "").lower().startswith("it"):
-            return "La richiesta in background non Ã¨ riuscita o Ã¨ stata annullata."
+            return "La richiesta in background non è riuscita o è stata annullata."
         return "The background request failed or was cancelled."
 
     @staticmethod

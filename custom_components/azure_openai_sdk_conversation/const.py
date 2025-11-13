@@ -1,4 +1,4 @@
-﻿# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py
+# File: /usr/share/hassio/homeassistant/custom_components/azure_openai_sdk_conversation/const.py
 """Constants for the Azure OpenAI SDK Conversation integration."""
 
 from __future__ import annotations

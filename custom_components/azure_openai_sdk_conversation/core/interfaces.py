@@ -1,4 +1,4 @@
-﻿"""
+"""
 Abstract interfaces for LangGraph migration preparation.
 
 Minimal abstraction layer to decouple agent logic from HA-specific implementations.

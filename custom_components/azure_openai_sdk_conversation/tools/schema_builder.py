@@ -1,4 +1,4 @@
-﻿# tools/schema_builder.py
+# tools/schema_builder.py
 """
 Tool schema builder - converte HA services in OpenAI function schemas
 """
@@ -299,7 +299,7 @@ class ToolSchemaBuilder:
         Returns:
             JSON schema dict
         """
-        # entity_id Ã¨ sempre string
+        # entity_id è sempre string
         if param_name == "entity_id":
             return {
                 "type": "string",

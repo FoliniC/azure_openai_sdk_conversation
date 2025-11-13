@@ -1,4 +1,4 @@
-﻿"""
+"""
 Basic tests for tool calling functionality.
 
 To run:

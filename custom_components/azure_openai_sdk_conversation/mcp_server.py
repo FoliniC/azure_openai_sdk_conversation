@@ -1,7 +1,7 @@
-﻿"""
+"""
 MCP Server per Home Assistant con gestione stateful del contesto.
 Invia il system prompt completo solo alla prima richiesta, poi mantiene
-lo stato e invia solo le entitÃ  che hanno cambiato stato.
+lo stato e invia solo le entità che hanno cambiato stato.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class EntityState:
-    """Rappresentazione dello stato di un'entitÃ ."""
+    """Rappresentazione dello stato di un'entità."""
 
     entity_id: str
     name: str
@@ -26,18 +26,18 @@ class EntityState:
     last_updated: str
 
     def __eq__(self, other: object) -> bool:
-        """Due stati sono uguali se lo stato corrente Ã¨ identico."""
+        """Due stati sono uguali se lo stato corrente è identico."""
         if not isinstance(other, EntityState):
             return False
         return self.entity_id == other.entity_id and self.state == other.state
 
 
 class HAMCPStateManager:
-    """Gestisce lo stato persistente delle entitÃ  HA per conversazioni MCP."""
+    """Gestisce lo stato persistente delle entità HA per conversazioni MCP."""
 
     def __init__(self) -> None:
         """Inizializza il gestore di stato."""
-        # Mappa conversation_id -> stato completo delle entitÃ 
+        # Mappa conversation_id -> stato completo delle entità
         self._conversations: Dict[str, Dict[str, EntityState]] = {}
         # Mappa conversation_id -> timestamp ultimo aggiornamento
         self._last_updated: Dict[str, datetime] = {}
@@ -45,7 +45,7 @@ class HAMCPStateManager:
         self._ttl_seconds: int = 3600
 
     def is_new_conversation(self, conversation_id: str) -> bool:
-        """Verifica se Ã¨ una nuova conversazione (richiede system prompt completo)."""
+        """Verifica se è una nuova conversazione (richiede system prompt completo)."""
         return conversation_id not in self._conversations
 
     def get_initial_prompt(
@@ -59,13 +59,13 @@ class HAMCPStateManager:
 
         Args:
             conversation_id: ID univoco della conversazione
-            entities: Lista entitÃ  esposte da HA
+            entities: Lista entità esposte da HA
             base_prompt: Template base del prompt
 
         Returns:
-            System prompt formattato con tutte le entitÃ 
+            System prompt formattato con tutte le entità
         """
-        # Converti entitÃ  in EntityState e memorizza
+        # Converti entità in EntityState e memorizza
         entity_states = {}
         for e in entities:
             state = EntityState(
@@ -109,11 +109,11 @@ This is your initial state snapshot. In subsequent messages, you will only recei
         current_entities: list[dict[str, Any]],
     ) -> str | None:
         """
-        Genera un prompt delta contenente solo le entitÃ  che hanno cambiato stato.
+        Genera un prompt delta contenente solo le entità che hanno cambiato stato.
 
         Args:
             conversation_id: ID della conversazione
-            current_entities: Stato attuale delle entitÃ  da HA
+            current_entities: Stato attuale delle entità da HA
 
         Returns:
             Prompt con solo i cambiamenti, None se nessun cambiamento
@@ -129,7 +129,7 @@ This is your initial state snapshot. In subsequent messages, you will only recei
         changed_entities: list[EntityState] = []
         new_entities: list[EntityState] = []
 
-        # Identifica cambiamenti e nuove entitÃ 
+        # Identifica cambiamenti e nuove entità
         for e in current_entities:
             entity_id = e["entity_id"]
             current_state = EntityState(
@@ -142,7 +142,7 @@ This is your initial state snapshot. In subsequent messages, you will only recei
             )
 
             if entity_id not in stored_states:
-                # Nuova entitÃ 
+                # Nuova entità
                 new_entities.append(current_state)
                 stored_states[entity_id] = current_state
             elif stored_states[entity_id] != current_state:
@@ -150,7 +150,7 @@ This is your initial state snapshot. In subsequent messages, you will only recei
                 changed_entities.append(current_state)
                 stored_states[entity_id] = current_state
 
-        # Identifica entitÃ  rimosse
+        # Identifica entità rimosse
         current_ids = {e["entity_id"] for e in current_entities}
         removed_ids = set(stored_states.keys()) - current_ids
         for eid in removed_ids:
@@ -193,7 +193,7 @@ This is your initial state snapshot. In subsequent messages, you will only recei
         return delta_prompt
 
     def _format_entities_as_csv(self, entities: list[EntityState]) -> str:
-        """Formatta una lista di entitÃ  come CSV raggruppato per area."""
+        """Formatta una lista di entità come CSV raggruppato per area."""
         # Raggruppa per area
         by_area: Dict[str, list[EntityState]] = {}
         for e in entities:
@@ -437,7 +437,7 @@ def patch_conversation_agent(agent: Any, hass: Any) -> Any:
         conversation_id: str | None = None,
     ) -> str:
         """Override del metodo _render_system_message per usare MCP."""
-        # Raccogli entitÃ  esposte
+        # Raccogli entità esposte
         entities = agent._collect_exposed_entities()
 
         # Usa MCP per preparare il messaggio (completo o delta)

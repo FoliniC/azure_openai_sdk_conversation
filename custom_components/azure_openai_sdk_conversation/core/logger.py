@@ -1,4 +1,4 @@
-﻿"""
+"""
 Custom logger for the conversation agent.
 
 Provides structured logging for requests, responses, and other events, with

@@ -1,4 +1,4 @@
-﻿"""
+"""
 MCP (Model Context Protocol) Server Manager.
 
 Manages stateful context tracking across conversation turns,
