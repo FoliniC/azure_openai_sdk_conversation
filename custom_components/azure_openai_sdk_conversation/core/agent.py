@@ -72,7 +72,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             config.sliding_window_max_tokens,
             config.sliding_window_preserve_system,
         )
-    
+
         # Initialize local intent handler
         self._local_handler = LocalIntentHandler(
             hass=hass,
@@ -257,7 +257,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                     content=text_raw,
                     tags={"input"},
                 )
-            
+
             # Check for pending continuation
             if conv_id and conv_id in self._pending_requests:
                 return await self._handle_pending_continuation(
@@ -379,30 +379,40 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             raise RuntimeError("No LLM client available")
 
         # One-time calculation of tool tokens, if needed
-        if self._tool_manager and self._memory and not self._base_tool_tokens_calculated:
+        if (
+            self._tool_manager
+            and self._memory
+            and not self._base_tool_tokens_calculated
+        ):
             try:
                 import json
                 import tiktoken
 
                 tool_definitions = await self._tool_manager.get_tools_schema()
                 if tool_definitions:
+
                     def count_tool_tokens():
                         """Synchronous token counting function."""
                         encoding = tiktoken.get_encoding("cl100k_base")
                         tools_json = json.dumps(tool_definitions)
                         return len(encoding.encode(tools_json))
 
-                    tool_token_count = await self._hass.async_add_executor_job(count_tool_tokens)
+                    tool_token_count = await self._hass.async_add_executor_job(
+                        count_tool_tokens
+                    )
                     await self._memory.async_set_base_tool_tokens(tool_token_count)
-                    self._logger.debug("Set base tool token count to: %d", tool_token_count)
-                
+                    self._logger.debug(
+                        "Set base tool token count to: %d", tool_token_count
+                    )
+
                 self._base_tool_tokens_calculated = True
 
             except (ImportError, Exception) as e:
-                self._logger.warning("Could not calculate and set tool token count: %r", e)
+                self._logger.warning(
+                    "Could not calculate and set tool token count: %r", e
+                )
                 # Set to True even on failure to avoid retrying every time
                 self._base_tool_tokens_calculated = True
-
 
         # Update metrics
         metrics.handler = "llm_responses" if use_responses else "llm_chat"
@@ -511,7 +521,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
                 content=content_to_log,
                 tags={"output"},
             )
-            
+
             # Log window stats
             stats = self._memory.get_stats(conv_id)
             self._logger.debug(
@@ -535,11 +545,11 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
     # ============================================================================
     # PARTE 5: Nuovo metodo per reset conversazione
     # ============================================================================
-    
+
     async def async_reset_conversation(self, conversation_id: str) -> None:
         """
         Reset conversation history for given conversation ID.
-        
+
         Args:
             conversation_id: Conversation ID to reset
         """
@@ -547,22 +557,19 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             await self._memory.reset_conversation(conversation_id)
             self._logger.info("Reset conversation: %s", conversation_id)
         else:
-            self._logger.warning(
-                "Cannot reset conversation: sliding window disabled"
-            )
-    
-    
+            self._logger.warning("Cannot reset conversation: sliding window disabled")
+
     # ============================================================================
     # PARTE 6: Nuovo metodo per ottenere stats
     # ============================================================================
-    
+
     def get_conversation_stats(self, conversation_id: str) -> dict[str, Any]:
         """
         Get statistics for a conversation.
-        
+
         Args:
             conversation_id: Conversation ID
-        
+
         Returns:
             Statistics dict
         """
@@ -570,7 +577,6 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
             return self._memory.get_stats(conversation_id)
         else:
             return {"error": "Sliding window disabled"}
-    
 
     async def _execute_with_early_timeout(
         self,

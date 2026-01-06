@@ -13,15 +13,15 @@ from .state import AgentState
 
 class IStateManager(Protocol):
     """Interface for state management."""
-    
+
     async def get_state(self, conversation_id: str) -> Optional[AgentState]:
         """Get current state for conversation."""
         ...
-    
+
     async def update_state(self, conversation_id: str, state: AgentState) -> None:
         """Update conversation state."""
         ...
-    
+
     async def reset_state(self, conversation_id: str) -> None:
         """Reset conversation state."""
         ...
@@ -29,7 +29,7 @@ class IStateManager(Protocol):
 
 class ILLMClient(Protocol):
     """Interface for LLM clients."""
-    
+
     async def complete(
         self,
         messages: list[dict[str, Any]],
@@ -39,7 +39,7 @@ class ILLMClient(Protocol):
     ) -> tuple[str, dict[str, int]]:
         """Complete conversation with text response."""
         ...
-    
+
     async def complete_with_tools(
         self,
         messages: list[dict[str, Any]],
@@ -50,7 +50,7 @@ class ILLMClient(Protocol):
     ) -> tuple[dict[str, Any], dict[str, int]]:
         """Complete conversation with tool calling support."""
         ...
-    
+
     async def close(self) -> None:
         """Clean up resources."""
         ...
@@ -58,7 +58,7 @@ class ILLMClient(Protocol):
 
 class IMemoryManager(ABC):
     """Abstract interface for conversation memory management."""
-    
+
     @abstractmethod
     async def add_message(
         self,
@@ -69,7 +69,7 @@ class IMemoryManager(ABC):
     ) -> None:
         """Add message to conversation history."""
         pass
-    
+
     @abstractmethod
     async def get_messages(
         self,
@@ -78,12 +78,12 @@ class IMemoryManager(ABC):
     ) -> list[dict[str, Any]]:
         """Get messages for LLM context."""
         pass
-    
+
     @abstractmethod
     async def reset_conversation(self, conversation_id: str) -> None:
         """Reset conversation history."""
         pass
-    
+
     @abstractmethod
     def get_stats(self, conversation_id: str) -> dict[str, Any]:
         """Get memory statistics."""
