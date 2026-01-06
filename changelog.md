@@ -1,5 +1,14 @@
 # CHANGELOG – Azure OpenAI SDK Conversation
 
+## 1.3.0 - 2026-01-06
+
+### Bug Fixes
+- **Config Flow Validator**: Fixed a `TypeError` in the configuration flow where the validator was incorrectly instantiated with too many arguments.
+- **Import Error**: Resolved an `ImportError` caused by a missing constant `RECOMMENDED_EARLY_TIMEOUT_SECONDS` and cleaned up the `utils` package structure to avoid ambiguity.
+- **Code Refactoring**: Unified utility modules (`utils.py` and `utils/`) to ensure consistent behavior and prevent import conflicts.
+
+---
+
 ## 1.2.0 - 2025-11-12
 
 ### New Features & Improvements

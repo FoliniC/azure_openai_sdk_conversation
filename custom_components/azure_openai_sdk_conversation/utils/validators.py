@@ -1,137 +1,185 @@
-# ============================================================================
-# utils/validators.py
-# ============================================================================
 """Validators for Azure OpenAI configuration."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 
+from ..const import (
+    RECOMMENDED_MAX_TOKENS,
+    RECOMMENDED_REASONING_EFFORT,
+    RECOMMENDED_TEMPERATURE,
+    RECOMMENDED_TOP_P,
+    RECOMMENDED_API_TIMEOUT,
+    RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
+)
 from .api_version import APIVersionManager
 
 
+class TokenParamHelper:
+    """Token parameter selector based on api-version."""
+
+    @staticmethod
+    def responses_token_param_for_version(ver: str) -> str:
+        """Responses: from 2025-03-01-preview => max_output_tokens, otherwise max_completion_tokens."""
+        y, m, d = APIVersionManager._date_tuple(ver)
+        return (
+            "max_output_tokens"
+            if (y, m, d) >= (2025, 3, 1)
+            else "max_completion_tokens"
+        )
+
+    @staticmethod
+    def chat_token_param_for_version(ver: str) -> str:
+        """Chat: from 2025-01-01-preview => max_completion_tokens, otherwise max_tokens."""
+        y, m, d = APIVersionManager._date_tuple(ver)
+        return "max_completion_tokens" if (y, m, d) >= (2025, 1, 1) else "max_tokens"
+
+
+def redact_api_key(value: str | None) -> str:
+    """Obscures an API key in logs/UI, leaving only the first/last 3 chars visible."""
+    if not value:
+        return ""
+    val = str(value)
+    if len(val) <= 8:
+        return "*" * len(val)
+    return f"{val[:3]}***{val[-3:]}"
+
+
+class AzureOpenAILogger:
+    """Thin wrapper for the logger, compatible with use in the validator."""
+
+    def __init__(self, name: str) -> None:
+        self._log = logging.getLogger(name)
+
+    def debug(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._log.debug(msg, *args, **kwargs)
+
+    def info(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._log.info(msg, *args, **kwargs)
+
+    def warning(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._log.warning(msg, *args, **kwargs)
+
+    def error(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._log.error(msg, *args, **kwargs)
+
+    def exception(self, msg: str, *args: Any, **kwargs: Any) -> None:
+        self._log.exception(msg, *args, **kwargs)
+
+
 class AzureOpenAIValidator:
-    """Validator for Azure OpenAI credentials and configuration."""
+    """
+    Validator for Step 1 of the config flow:
+    - verifies credentials by calling /openai/models,
+    - determines the effective api_version and a consistent token_param for the model.
+    """
 
     def __init__(
         self,
-        hass: HomeAssistant,
+        hass: Any,
         api_key: str,
         api_base: str,
-        model: str,
+        chat_model: str,
+        log: AzureOpenAILogger,
     ) -> None:
-        """
-        Initialize validator.
-
-        Args:
-            hass: Home Assistant instance
-            api_key: Azure OpenAI API key
-            api_base: API base URL
-            model: Model/deployment name
-        """
         self._hass = hass
-        self._api_key = api_key
-        self._api_base = api_base.rstrip("/")
-        self._model = model
+        self._api_key = (api_key or "").strip()
+        self._api_base = (api_base or "").rstrip("/")
+        self._model = (chat_model or "").strip()
+        self._log = log
 
-    async def validate(self, api_version: str | None = None) -> dict[str, Any]:
-        """
-        Validate credentials by calling /openai/models endpoint.
+    async def validate(self, api_version: str | None) -> dict[str, Any]:
+        """Returns {'api_version': str, 'token_param': str} or raises an exception with messages useful for the UI."""
+        # Normalize recommended api-version
+        requested_version = (
+            api_version or ""
+        ).strip() or APIVersionManager.best_for_model(self._model)
+        use_responses = self._model.lower().startswith("o")
+        effective_version = (
+            APIVersionManager.ensure_min(requested_version, "2025-03-01-preview")
+            if use_responses
+            else requested_version
+        )
 
-        Args:
-            api_version: API version to use (optional)
+        base = self._api_base
+        if "://" not in base:
+            base = f"https://{base}"
+        url = f"{base}/openai/models"
 
-        Returns:
-            Dict with validated settings
-
-        Raises:
-            Exception if validation fails
-        """
-        # Determine API version
-        if not api_version:
-            api_version = APIVersionManager.best_for_model(self._model)
-
-        # Build request
-        url = f"{self._api_base}/openai/models"
-        headers = {
-            "api-key": self._api_key,
-            "Accept": "application/json",
-        }
-
-        # Execute request
         http = get_async_client(self._hass)
+        headers = {"api-key": self._api_key, "Accept": "application/json"}
+
+        self._log.debug(
+            "Validating Azure OpenAI credentials at %s (api-version=%s)",
+            base,
+            effective_version,
+        )
         try:
             resp = await http.get(
                 url,
-                params={"api-version": api_version},
+                params={"api-version": effective_version},
                 headers=headers,
                 timeout=10,
             )
-        except Exception as err:
-            raise Exception(f"Connection failed: {err}") from err
+        except Exception as err:  # noqa: BLE001
+            raise Exception(f"cannot_connect: {err}") from err
 
-        # Check response
-        if resp.status_code == 401 or resp.status_code == 403:
-            raise Exception("Invalid API key (unauthorized)")
-
+        if resp.status_code in (401, 403):
+            raise Exception("invalid_auth: unauthorized/forbidden (401/403)")
         if resp.status_code == 404:
-            raise Exception("Deployment not found or invalid endpoint")
-
+            text = (await resp.aread()).decode("utf-8", "ignore")
+            raise Exception(f"invalid_deployment or not found (404): {text}")
         if resp.status_code >= 400:
-            body = await resp.aread()
-            raise Exception(
-                f"HTTP {resp.status_code}: {body.decode('utf-8', 'ignore')}"
-            )
+            text = (await resp.aread()).decode("utf-8", "ignore")
+            raise Exception(f"unknown: HTTP {resp.status_code}: {text}")
 
-        # Determine token parameter
-        model_lower = self._model.lower()
-        if model_lower.startswith("o"):
-            token_param = "max_output_tokens"
-        else:
-            # Based on API version
-            parts = api_version.split("-")
-            try:
-                year = int(parts[0])
-                month = int(parts[1])
-                if (year, month) >= (2025, 1):
-                    token_param = "max_completion_tokens"
-                else:
-                    token_param = "max_tokens"
-            except (ValueError, IndexError):
-                token_param = "max_tokens"
-
-        return {
-            "api_version": api_version,
-            "token_param": token_param,
-        }
+        token_param = (
+            TokenParamHelper.responses_token_param_for_version(effective_version)
+            if use_responses
+            else TokenParamHelper.chat_token_param_for_version(effective_version)
+        )
+        return {"api_version": effective_version, "token_param": token_param}
 
     async def capabilities(self) -> dict[str, dict[str, Any]]:
         """
-        Get model capabilities metadata.
-
-        Returns:
-            Dict of parameter name -> metadata
+        Returns metadata for the second step (dynamic fields).
+        Default values are aligned with RECOMMENDED_* constants; generic ranges are safe.
         """
-        return {
+        caps: dict[str, dict[str, Any]] = {
             "temperature": {
-                "default": 0.7,
+                "default": RECOMMENDED_TEMPERATURE,
                 "min": 0.0,
                 "max": 2.0,
                 "step": 0.05,
             },
             "top_p": {
-                "default": 1.0,
+                "default": RECOMMENDED_TOP_P,
                 "min": 0.0,
                 "max": 1.0,
                 "step": 0.01,
             },
             "max_tokens": {
-                "default": 512,
+                "default": RECOMMENDED_MAX_TOKENS,
                 "min": 1,
                 "max": 8192,
                 "step": 1,
             },
+            "reasoning_effort": {"default": RECOMMENDED_REASONING_EFFORT},
+            "api_timeout": {
+                "default": RECOMMENDED_API_TIMEOUT,
+                "min": 5,
+                "max": 120,
+                "step": 1,
+            },
+            "exposed_entities_limit": {
+                "default": RECOMMENDED_EXPOSED_ENTITIES_LIMIT,
+                "min": 50,
+                "max": 2000,
+                "step": 10,
+            },
         }
+        # Note: you can expand with other specific fields in the future.
+        return caps
