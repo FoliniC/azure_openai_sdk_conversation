@@ -44,9 +44,9 @@ def config(mock_hass):
 
 
 @pytest.fixture
-def logger(config):
+def logger(mock_hass, config):
     """Mock AgentLogger."""
-    return AgentLogger(config)
+    return AgentLogger(mock_hass, config)
 
 
 @pytest.fixture
@@ -59,7 +59,7 @@ def memory_manager(mock_hass, config, logger):
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_add_message_creates_window(memory_manager):
     """Test that adding message creates new window."""
     conv_id = "test_conv_1"
@@ -76,7 +76,7 @@ async def test_add_message_creates_window(memory_manager):
     assert stats["message_count"] == 1
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_fifo_eviction(memory_manager):
     """Test FIFO eviction when token limit exceeded."""
     conv_id = "test_conv_2"
@@ -96,7 +96,7 @@ async def test_fifo_eviction(memory_manager):
     assert stats["current_tokens"] <= 100
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_preserve_system_messages(memory_manager):
     """Test that system messages are preserved during eviction."""
     conv_id = "test_conv_3"
@@ -123,7 +123,7 @@ async def test_preserve_system_messages(memory_manager):
     assert any(msg["role"] == "system" for msg in messages)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_tag_filtering(memory_manager):
     """Test message retrieval with tag filter."""
     conv_id = "test_conv_4"
@@ -152,7 +152,7 @@ async def test_tag_filtering(memory_manager):
     assert important_msgs[0]["role"] == "user"
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_reset_conversation(memory_manager):
     """Test conversation reset."""
     conv_id = "test_conv_5"
@@ -172,7 +172,7 @@ async def test_reset_conversation(memory_manager):
     assert stats["exists"] is False
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_token_counting(memory_manager):
     """Test accurate token counting with tiktoken."""
     conv_id = "test_conv_6"
@@ -192,7 +192,7 @@ async def test_token_counting(memory_manager):
     assert stats["current_tokens"] < len(text)  # Tokens < chars
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_multiple_conversations(memory_manager):
     """Test managing multiple conversations."""
     conv_ids = ["conv_1", "conv_2", "conv_3"]
@@ -210,7 +210,7 @@ async def test_multiple_conversations(memory_manager):
     assert set(all_convs) == set(conv_ids)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_tag_distribution_stats(memory_manager):
     """Test tag distribution in stats."""
     conv_id = "test_conv_7"

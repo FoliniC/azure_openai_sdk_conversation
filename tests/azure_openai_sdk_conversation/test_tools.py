@@ -19,7 +19,7 @@ from custom_components.azure_openai_sdk_conversation.tools import (
 @pytest.fixture
 def mock_hass():
     """Create mock Home Assistant instance."""
-    hass = MagicMock(spec=HomeAssistant)
+    hass = MagicMock()
     hass.services = MagicMock()
     hass.services.async_services = MagicMock(
         return_value={
@@ -77,7 +77,7 @@ def mock_hass():
     return hass
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_schema_builder_basic(mock_hass):
     """Test basic schema building."""
     builder = ToolSchemaBuilder(mock_hass)
@@ -92,7 +92,7 @@ async def test_schema_builder_basic(mock_hass):
     assert "parameters" in tools[0]["function"]
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_schema_builder_filters_domains(mock_hass):
     """Test domain filtering."""
     builder = ToolSchemaBuilder(mock_hass)
@@ -105,7 +105,7 @@ async def test_schema_builder_filters_domains(mock_hass):
     assert not any(name.startswith("switch_") for name in light_names)
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_function_executor_validation(mock_hass):
     """Test function executor validation."""
     executor = FunctionExecutor(
@@ -133,7 +133,7 @@ async def test_function_executor_validation(mock_hass):
     mock_hass.services.async_call.assert_called_once()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_function_executor_blacklist(mock_hass):
     """Test blacklisted service rejection."""
     executor = FunctionExecutor(
@@ -157,7 +157,7 @@ async def test_function_executor_blacklist(mock_hass):
     assert "blacklisted" in result["content"].lower()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_function_executor_rate_limit(mock_hass):
     """Test rate limiting."""
     executor = FunctionExecutor(
@@ -191,7 +191,7 @@ async def test_function_executor_rate_limit(mock_hass):
     assert "rate limit" in result["content"].lower()
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_function_executor_invalid_entity(mock_hass):
     """Test invalid entity_id handling."""
     executor = FunctionExecutor(
@@ -220,7 +220,7 @@ async def test_function_executor_invalid_entity(mock_hass):
     )
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_tool_manager_cache(mock_hass):
     """Test tool schema caching."""
     from custom_components.azure_openai_sdk_conversation.core.config import AgentConfig
@@ -237,7 +237,7 @@ async def test_tool_manager_cache(mock_hass):
         },
     )
 
-    logger = AgentLogger(config)
+    logger = AgentLogger(mock_hass, config)
 
     manager = ToolManager(hass=mock_hass, config=config, logger=logger)
 

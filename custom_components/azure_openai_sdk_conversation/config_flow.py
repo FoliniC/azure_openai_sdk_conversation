@@ -308,14 +308,13 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         ] = BooleanSelector()
 
         # Only show additional options if sliding window is enabled
-        if user_input and user_input.get(CONF_SLIDING_WINDOW_ENABLE, True):
+        if (user_input or {}).get(
+            CONF_SLIDING_WINDOW_ENABLE, RECOMMENDED_SLIDING_WINDOW_ENABLE
+        ):
             cap_schema[
                 vol.Optional(
                     CONF_SLIDING_WINDOW_MAX_TOKENS,
-                    default=self.config_entry.options.get(
-                        CONF_SLIDING_WINDOW_MAX_TOKENS,
-                        RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
-                    ),
+                    default=RECOMMENDED_SLIDING_WINDOW_MAX_TOKENS,
                 )
             ] = NumberSelector(
                 NumberSelectorConfig(
@@ -328,10 +327,7 @@ class AzureOpenAIConfigFlow(ConfigFlow, domain=DOMAIN):
         cap_schema[
             vol.Optional(
                 CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
-                default=self.config_entry.options.get(
-                    CONF_SLIDING_WINDOW_PRESERVE_SYSTEM,
-                    RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
-                ),
+                default=RECOMMENDED_SLIDING_WINDOW_PRESERVE_SYSTEM,
             )
         ] = BooleanSelector()
 
