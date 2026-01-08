@@ -1,8 +1,10 @@
 from __future__ import annotations
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock, AsyncMock, patch
+import time
 
 from homeassistant.core import HomeAssistant
+from homeassistant.components import conversation
 from custom_components.azure_openai_sdk_conversation.core.agent import AzureOpenAIConversationAgent
 from custom_components.azure_openai_sdk_conversation.core.config import AgentConfig
 from custom_components.azure_openai_sdk_conversation.const import (
@@ -27,32 +29,14 @@ MOCK_OPTIONS = {
 }
 
 @pytest.fixture
-def mock_hass() -> HomeAssistant:
-    """Fixture for a mock Home Assistant."""
-    hass = MagicMock()
-    
-    # Mock config.path
-    def mock_path(*args):
-        return "/config/" + "/".join(args)
-    hass.config.path = mock_path
-    
-    # Mock async_add_executor_job
-    async def mock_executor(func, *args):
-        return func(*args)
-    hass.async_add_executor_job = mock_executor
-    
-    hass.data = {}
-    hass.states = MagicMock()
-    hass.services = MagicMock()
-    
-    return hass
-
-@pytest.fixture
-def agent(mock_hass) -> AzureOpenAIConversationAgent:
+def agent(hass) -> AzureOpenAIConversationAgent:
     """Fixture for a conversation agent instance."""
     conf_dict = {**MOCK_CONFIG_DATA, **MOCK_OPTIONS}
-    config = AgentConfig.from_dict(mock_hass, conf_dict)
-    return AzureOpenAIConversationAgent(mock_hass, config)
+    config = AgentConfig.from_dict(hass, conf_dict)
+    agent = AzureOpenAIConversationAgent(hass, config)
+    # Manually set agent_id to avoid MagicMock parent issue
+    agent.agent_id = "test_agent"
+    return agent
 
 @pytest.mark.anyio
 async def test_agent_initialization(agent):
@@ -61,6 +45,12 @@ async def test_agent_initialization(agent):
     assert agent._config.chat_model == "gpt-4o-mini"
     assert agent._config.vocabulary_enable is True
     assert agent._config.local_intent_enable is True
+
+@pytest.mark.anyio
+async def test_supported_languages(agent):
+    """Test supported languages."""
+    assert "en" in agent.supported_languages
+    assert "it" in agent.supported_languages
 
 @pytest.mark.parametrize(
     "input_text, expected_text",
@@ -101,3 +91,76 @@ def test_extract_onoff_intent(agent, normalized_text, expected_action, expected_
         action, tokens = intent
         assert action == expected_action
         assert tokens == expected_tokens
+
+@pytest.mark.anyio
+async def test_async_process_empty_input(agent):
+    """Test processing empty input."""
+    user_input = conversation.ConversationInput(
+        text="",
+        context=MagicMock(),
+        conversation_id="test_conv",
+        language="en",
+    )
+    result = await agent.async_process(user_input)
+    assert result.response.response_type == conversation.ResponseType.ACTION_DONE
+
+@pytest.mark.anyio
+async def test_async_process_default_agent_delegation(agent, hass):
+    """Test delegation to default HA agent."""
+    user_input = conversation.ConversationInput(
+        text="turn on light",
+        context=MagicMock(),
+        conversation_id="test_conv",
+        language="en",
+    )
+    
+    mock_default_agent = AsyncMock()
+    mock_default_agent.agent_id = "homeassistant"
+    
+    from homeassistant.helpers.intent import IntentResponse
+    mock_response = IntentResponse(language="en")
+    mock_response.async_set_speech("OK, turned on")
+    
+    mock_default_agent.async_process.return_value = conversation.ConversationResult(
+        response=mock_response,
+        conversation_id="test_conv"
+    )
+    
+    agent_manager = MagicMock()
+    agent_manager.async_get_agent = AsyncMock(return_value=mock_default_agent)
+    
+    with patch("homeassistant.components.conversation.get_agent_manager", return_value=agent_manager):
+        result = await agent.async_process(user_input)
+        
+    assert result.response.speech["plain"]["speech"] == "OK, turned on"
+    mock_default_agent.async_process.assert_called_once()
+
+@pytest.mark.anyio
+async def test_async_process_llm_fallback(agent, hass):
+    """Test fallback to LLM when local intent fails."""
+    user_input = conversation.ConversationInput(
+        text="What is the weather?",
+        context=MagicMock(),
+        conversation_id="test_conv",
+        language="en",
+    )
+    
+    # Mock no default agent or default agent returns no_intent_match
+    agent_manager = MagicMock()
+    agent_manager.async_get_agent = AsyncMock(side_effect=ValueError("Not found"))
+    
+    # Mock local handler failure
+    agent._local_handler.try_handle = AsyncMock(return_value=None)
+    
+    # Mock collector to avoid registry errors
+    agent._prompt_builder._collector.collect = AsyncMock(return_value=[])
+    
+    # Mock ChatClient
+    with patch.object(agent, "_chat_client") as mock_chat:
+        mock_chat.complete = AsyncMock(return_value=("It is sunny.", {"total": 10}))
+        mock_chat.effective_api_version = "2024-05-01-preview"
+        
+        with patch("homeassistant.components.conversation.get_agent_manager", return_value=agent_manager):
+            result = await agent.async_process(user_input)
+            
+    assert result.response.speech["plain"]["speech"] == "It is sunny."

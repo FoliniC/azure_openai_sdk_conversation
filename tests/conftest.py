@@ -1,13 +1,30 @@
-import tests.mock_ha # Must be first to mock HA modules
-import socket
-import _socket
+"""Global test configuration for anyio-based tests."""
 import os
 import sys
+
+# -----------------------------------------------------------------------------
+# 1. Path Setup (MUST be first)
+# -----------------------------------------------------------------------------
+# Add the 'tests' directory itself so we can import 'mock_ha' as a module if needed
+sys.path.insert(0, os.path.dirname(__file__))
+
+# Add the project root (up one level from 'tests') so we can import 'custom_components'
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, "custom_components"))
+
+# -----------------------------------------------------------------------------
+# 2. Imports (Now safe to import local modules)
+# -----------------------------------------------------------------------------
+import mock_ha  # Import directly since 'tests' dir is in path now
+import socket
+import _socket
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-import pathlib
 
-# Ensure sockets are enabled and won't be disabled
+# -----------------------------------------------------------------------------
+# 3. Socket Patching
+# -----------------------------------------------------------------------------
 try:
     import pytest_socket
     pytest_socket.disable_socket = lambda *args, **kwargs: None
@@ -20,18 +37,12 @@ socket.socket = _socket.socket
 if hasattr(_socket, "socketpair"):
     socket.socketpair = _socket.socketpair
 
-@pytest.fixture
-def enable_custom_integrations():
-    """Mock fixture if not provided by plugin."""
-    return True
-
-@pytest.fixture(autouse=True)
-def auto_enable_custom_integrations(enable_custom_integrations):
-    """Enable custom integrations defined in the test repository."""
-    yield
+# -----------------------------------------------------------------------------
+# 4. Fixtures & Configuration
+# -----------------------------------------------------------------------------
 
 def pytest_configure(config):
-    """Add project root to python path and ensure sockets are enabled."""
+    """Add markers and ensure sockets are enabled."""
     config.addinivalue_line("markers", "allow_socket: allow socket usage")
     config.addinivalue_line("markers", "no_fail_on_log_exception: mark test to not fail on log exception")
     
@@ -41,28 +52,49 @@ def pytest_configure(config):
     except Exception:
         pass
 
-    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    sys.path.insert(0, project_root)
-    # Also add custom_components directory specifically
-    sys.path.insert(0, os.path.join(project_root, "custom_components"))
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def anyio_backend():
+    """Select asyncio as the backend for anyio tests."""
     return "asyncio"
 
-# --- Cronostar specific fixtures (adapted) ---
 
-# Mock Path.mkdir was causing FileNotFoundError for pytest internal tmp directories.
-# Removing it should allow pytest to work correctly in the container.
-# @pytest.fixture(autouse=True)
-# def mock_path_mkdir():
-#     with patch("pathlib.Path.mkdir") as mock:
-#         yield mock
+@pytest.fixture
+def enable_custom_integrations():
+    """Mock fixture if not provided by plugin."""
+    return True
+
+
+@pytest.fixture(autouse=True)
+def auto_enable_custom_integrations(enable_custom_integrations):
+    """Enable custom integrations defined in the test repository."""
+    yield
+
+
+@pytest.fixture
+def platforms() -> list[str]:
+    """Fixture for platforms to be loaded."""
+    return ["conversation"]
+
+
+@pytest.fixture(autouse=True)
+def patch_mcp_manager():
+    """Ensure MCPManager.start is always an AsyncMock to avoid runtime warnings."""
+    # This single fixture handles the global patching for MCPManager
+    with patch("custom_components.azure_openai_sdk_conversation.context.mcp_manager.MCPManager") as MockMCP:
+        mock_instance = MockMCP.return_value
+        mock_instance.start = AsyncMock(return_value=None)
+        mock_instance.stop = AsyncMock(return_value=None)
+        mock_instance.get_tools = AsyncMock(return_value=[])
+        mock_instance.is_new_conversation = MagicMock(return_value=True)
+        mock_instance.build_initial_prompt = MagicMock(return_value="Mock Initial Prompt")
+        mock_instance.build_delta_prompt = MagicMock(return_value="Mock Delta Prompt")
+        yield mock_instance
+
 
 @pytest.fixture
 def hass(tmp_path):
     """Mock Home Assistant instance."""
-    # Try importing DOMAIN, if fails (e.g. structure difference), define it string
     try:
         from custom_components.cronostar.const import DOMAIN
     except ImportError:
@@ -84,13 +116,8 @@ def hass(tmp_path):
         "storage_manager": storage_manager
     }}
     
-    # Create a temporary config directory (using standard tmp_path)
+    # Create a temporary config directory
     config_dir = tmp_path / "config"
-    # Ensure it exists (mock_path_mkdir might block this if active? 
-    # But mock_path_mkdir is autouse=True... 
-    # If mock_path_mkdir is active, os.makedirs might still work if it doesn't use pathlib.Path.mkdir internally?
-    # Python's os.makedirs usually uses os.mkdir. 
-    # Let's use os.makedirs to be safe.)
     os.makedirs(str(config_dir), exist_ok=True)
     
     def mock_path(x=None):
@@ -103,7 +130,6 @@ def hass(tmp_path):
     
     # Mock states with proper structure
     hass.states.get = MagicMock(return_value=None)
-    
     hass.states.async_set = MagicMock()
     hass.states.async_remove = MagicMock()
     hass.services.async_call = AsyncMock()
@@ -113,8 +139,17 @@ def hass(tmp_path):
     hass.config_entries.flow.async_init = AsyncMock()
     hass.config_entries.async_update_entry = MagicMock()
     
-    # Mock loop
-    hass.loop.create_task = MagicMock()
+    # ---------------------------------------------------------
+    # ✅ FIX: Mock loop.create_task inside the fixture function
+    # ---------------------------------------------------------
+    def mock_create_task(coro):
+        """Mock create_task that closes coroutines to suppress warnings."""
+        if hasattr(coro, "close"):
+            coro.close()  # Silences 'coroutine never awaited'
+        return MagicMock()
+
+    hass.loop.create_task = MagicMock(side_effect=mock_create_task)
+    # ---------------------------------------------------------
     
     # Mock async_add_executor_job
     async def mock_executor(target, *args, **kwargs):
@@ -173,17 +208,14 @@ def mock_storage_manager():
     ])
     return manager
 
+
 @pytest.fixture
 def mock_coordinator(hass, mock_storage_manager):
     """Create a mock coordinator."""
-    # We mock the class so we don't need real imports that might fail
-    # But the test using this fixture likely imports the real class.
-    # The original conftest imported it.
     try:
         from custom_components.cronostar.coordinator import CronoStarCoordinator
         from custom_components.cronostar.const import DOMAIN
     except ImportError:
-        # Fallback for compilation if modules missing
         CronoStarCoordinator = MagicMock()
         DOMAIN = "cronostar"
     
@@ -212,14 +244,17 @@ def mock_coordinator(hass, mock_storage_manager):
     
     return coordinator
 
+
 def pytest_collection_modifyitems(config, items):
+    """Automatically add markers to all tests."""
     import inspect
-    print(f"DEBUG: modifyitems called with {len(items)} items")
+    
     for item in items:
-        # Add anyio marker to all async tests
+        # Add anyio marker to all async tests if not already present
         if inspect.iscoroutinefunction(item.obj):
-            # print(f"DEBUG: Marking {item.name} as anyio")
-            item.add_marker("anyio")
+            if "anyio" not in [m.name for m in item.iter_markers()]:
+                item.add_marker(pytest.mark.anyio)
             
-        item.add_marker("no_fail_on_log_exception")
-        item.add_marker("allow_socket")
+        # Add standard markers
+        item.add_marker(pytest.mark.no_fail_on_log_exception)
+        item.add_marker(pytest.mark.allow_socket)

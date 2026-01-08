@@ -1,3 +1,4 @@
+"""Mock Home Assistant modules for testing."""
 from unittest.mock import MagicMock, AsyncMock
 import sys
 import types
@@ -25,32 +26,19 @@ class MockEntity:
         self._attr_device_class = None
         self._attr_translation_key = None
         self.registry_entry = None
-        self._attr_device_class = None
-        self._attr_native_unit_of_measurement = None
 
     @property
-    def unique_id(self):
-        return self._attr_unique_id
-
+    def unique_id(self): return self._attr_unique_id
     @property
-    def name(self):
-        return self._attr_name
-        
+    def name(self): return self._attr_name
     @property
-    def device_info(self):
-        return self._attr_device_info
-        
+    def device_info(self): return self._attr_device_info
     @property
-    def extra_state_attributes(self):
-        return {}
-        
+    def extra_state_attributes(self): return {}
     @property
-    def device_class(self):
-        return self._attr_device_class
-        
+    def device_class(self): return self._attr_device_class
     @property
-    def native_unit_of_measurement(self):
-        return self._attr_native_unit_of_measurement
+    def native_unit_of_measurement(self): return self._attr_native_unit_of_measurement
 
 class MockCoordinatorEntity(MockEntity):
     def __init__(self, coordinator):
@@ -65,55 +53,29 @@ class MockDataUpdateCoordinator(MagicMock):
         self.name = name
         self.update_interval = update_interval
         self.data = {}
-    
-    async def async_refresh(self):
-        pass
-        
-    async def async_config_entry_first_refresh(self):
-        pass
+    async def async_refresh(self): pass
+    async def async_config_entry_first_refresh(self): pass
 
 class MockConfigFlow:
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__()
-    
-    def __init__(self):
-        self.hass = None
-    
-    async def async_set_unique_id(self, *args, **kwargs):
-        return MagicMock()
-    
-    def _abort_if_unique_id_configured(self, *args, **kwargs):
-        pass
-        
-    def async_abort(self, **kwargs):
-        return {"type": "abort", **kwargs}
-        
-    def async_create_entry(self, **kwargs):
-        return {"type": "create_entry", **kwargs}
-        
-    def async_show_form(self, **kwargs):
-        return {"type": "form", **kwargs}
+    def __init_subclass__(cls, **kwargs): super().__init_subclass__()
+    def __init__(self): self.hass = None
+    async def async_set_unique_id(self, *args, **kwargs): return MagicMock()
+    def _abort_if_unique_id_configured(self, *args, **kwargs): pass
+    def async_abort(self, **kwargs): return {"type": "abort", **kwargs}
+    def async_create_entry(self, **kwargs): return {"type": "create_entry", **kwargs}
+    def async_show_form(self, **kwargs): return {"type": "form", **kwargs}
 
 class MockOptionsFlow:
     def __init__(self, config_entry=None):
         self._config_entry = config_entry
         self.hass = None
-
     @property
-    def config_entry(self):
-        return self._config_entry
-
+    def config_entry(self): return self._config_entry
     @config_entry.setter
-    def config_entry(self, value):
-        self._config_entry = value
+    def config_entry(self, value): self._config_entry = value
+    def async_create_entry(self, **kwargs): return {"type": "create_entry", **kwargs}
+    def async_show_form(self, **kwargs): return {"type": "form", **kwargs}
 
-    def async_create_entry(self, **kwargs):
-        return {"type": "create_entry", **kwargs}
-        
-    def async_show_form(self, **kwargs):
-        return {"type": "form", **kwargs}
-
-# Mock Platform enum
 class Platform(StrEnum):
     CONVERSATION = "conversation"
     SENSOR = "sensor"
@@ -131,6 +93,26 @@ class FlowResultType(StrEnum):
     SHOW_PROGRESS = "show_progress"
 
 FlowResult = dict[str, Any]
+
+class ResponseType(StrEnum):
+    ACTION_DONE = "action_done"
+    ERROR = "error"
+
+class MockIntentResponse:
+    def __init__(self, language=None):
+        self.language = language
+        self.speech = {}
+        self.response_type = ResponseType.ACTION_DONE
+        self.error_code = None
+    def async_set_speech(self, speech, speech_type="plain", **kwargs):
+        self.speech[speech_type] = {"speech": speech}
+
+class MockSelector:
+    def __init__(self, *args, **kwargs): pass
+
+class SelectSelectorMode(StrEnum):
+    DROPDOWN = "dropdown"
+    LIST = "list"
 
 # Create mock modules
 ha = mock_module("homeassistant")
@@ -178,31 +160,35 @@ ha.helpers.config_validation.enum = MagicMock()
 
 ha.helpers.template = mock_module("homeassistant.helpers.template")
 ha.helpers.template.Template = MagicMock
+
 ha.helpers.intent = mock_module("homeassistant.helpers.intent")
-ha.helpers.intent.IntentResponse = MagicMock
+ha.helpers.intent.IntentResponse = MockIntentResponse
+
 ha.helpers.httpx_client = mock_module("homeassistant.helpers.httpx_client")
 ha.helpers.httpx_client.get_async_client = MagicMock()
-ha.helpers.area_registry = mock_module("homeassistant.helpers.area_registry")
-ha.helpers.device_registry = mock_module("homeassistant.helpers.device_registry")
-ha.helpers.entity_registry = mock_module("homeassistant.helpers.entity_registry")
 
-# Added for Azure
+ha.helpers.area_registry = mock_module("homeassistant.helpers.area_registry")
+ha.helpers.area_registry.async_get = MagicMock()
+ha.helpers.device_registry = mock_module("homeassistant.helpers.device_registry")
+ha.helpers.device_registry.async_get = MagicMock()
+ha.helpers.entity_registry = mock_module("homeassistant.helpers.entity_registry")
+ha.helpers.entity_registry.async_get = MagicMock()
+
 ha.helpers.llm = mock_module("homeassistant.helpers.llm")
 ha.helpers.llm.DEFAULT_INSTRUCTIONS_PROMPT = "Default prompt"
 
-# Added for Azure
 ha.helpers.typing = mock_module("homeassistant.helpers.typing")
 ha.helpers.typing.ConfigType = dict[str, Any]
+ha.helpers.typing.VolDictType = dict[Any, Any]
 
-# Added for Azure
 ha.helpers.selector = mock_module("homeassistant.helpers.selector")
-ha.helpers.selector.BooleanSelector = MagicMock
-ha.helpers.selector.NumberSelector = MagicMock
-ha.helpers.selector.NumberSelectorConfig = MagicMock
-ha.helpers.selector.SelectSelector = MagicMock
-ha.helpers.selector.SelectSelectorConfig = MagicMock
-ha.helpers.selector.SelectSelectorMode = MagicMock
-ha.helpers.selector.TemplateSelector = MagicMock
+ha.helpers.selector.BooleanSelector = MockSelector
+ha.helpers.selector.NumberSelector = MockSelector
+ha.helpers.selector.NumberSelectorConfig = MockSelector
+ha.helpers.selector.SelectSelector = MockSelector
+ha.helpers.selector.SelectSelectorConfig = MockSelector
+ha.helpers.selector.SelectSelectorMode = SelectSelectorMode
+ha.helpers.selector.TemplateSelector = MockSelector
 
 ha.helpers.update_coordinator = mock_module("homeassistant.helpers.update_coordinator")
 ha.helpers.update_coordinator.DataUpdateCoordinator = MockDataUpdateCoordinator
@@ -211,7 +197,6 @@ ha.helpers.update_coordinator.CoordinatorEntity = MockCoordinatorEntity
 ha.helpers.entity = mock_module("homeassistant.helpers.entity")
 ha.helpers.entity.EntityCategory = MagicMock()
 
-# Added for Cronostar (missing in my prev attempt? no I added it)
 ha.helpers.frame = mock_module("homeassistant.helpers.frame")
 ha.helpers.frame.ReportBehavior = MagicMock
 ha.helpers.frame.report_usage = MagicMock()
@@ -235,17 +220,15 @@ ha.components.http = mock_module("homeassistant.components.http")
 ha.components.http.StaticPathConfig = MagicMock
 ha.components.http.start_http_server_and_save_config = MagicMock
 
-# Added for Azure
 ha.components.conversation = mock_module("homeassistant.components.conversation")
 ha.components.conversation.AbstractConversationAgent = MagicMock
 ha.components.conversation.ConversationInput = MagicMock
 ha.components.conversation.ConversationResult = MagicMock
 ha.components.conversation.DOMAIN = "conversation"
-# Also need to ensure get_agent_manager etc. if used, but Azure agent mainly uses AbstractConversationAgent.
-# In test_conversation.py, we verify agent processes. 
-# agent.py imports: conversation.get_agent_manager(self._hass).
+ha.components.conversation.async_set_agent = MagicMock()
+ha.components.conversation.async_register_agent = MagicMock()
 ha.components.conversation.get_agent_manager = MagicMock()
-ha.components.conversation.ResponseType = MagicMock()
+ha.components.conversation.ResponseType = ResponseType
 
 ha.components.persistent_notification = mock_module("homeassistant.components.persistent_notification")
 ha.components.persistent_notification.async_create = MagicMock()
@@ -267,7 +250,6 @@ ha.exceptions.ConfigEntryNotReady = type("ConfigEntryNotReady", (Exception,), {}
 ha.util = mock_module("homeassistant.util")
 ha.util.dt = MagicMock()
 
-# Mock voluptuous
 vol = mock_module("voluptuous")
 vol.Schema = MagicMock
 vol.Optional = MagicMock
@@ -277,7 +259,6 @@ vol.Coerce = MagicMock
 vol.In = MagicMock
 vol.ALLOW_EXTRA = "ALLOW_EXTRA"
 
-# Inject into sys.modules
 sys.modules["homeassistant"] = ha
 sys.modules["homeassistant.const"] = ha.const
 sys.modules["homeassistant.core"] = ha.core
