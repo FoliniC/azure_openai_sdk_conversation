@@ -14,10 +14,10 @@ import asyncio
 import json
 import logging
 from collections import defaultdict
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, List, Set
+from typing import Any, Dict, Optional
 from .metrics import RequestMetrics, AggregatedStats
 
 _LOGGER = logging.getLogger(__name__)
