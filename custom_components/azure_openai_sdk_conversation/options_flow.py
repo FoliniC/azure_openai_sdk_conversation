@@ -22,7 +22,6 @@ from homeassistant.helpers.selector import (
 
 from .const import (
     CONF_API_BASE,
-    CONF_API_KEY,
     CONF_CHAT_MODEL,
     CONF_API_TIMEOUT,
     CONF_API_VERSION,
