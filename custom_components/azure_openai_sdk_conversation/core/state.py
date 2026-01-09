@@ -5,6 +5,7 @@ Designed for easy migration to LangGraph StateDict in the future.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Optional

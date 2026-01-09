@@ -4,8 +4,9 @@ Unit tests for ConversationMemoryManager.
 Run with: pytest tests/test_conversation_memory.py -v
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 from custom_components.azure_openai_sdk_conversation.context.conversation_memory import (
     ConversationMemoryManager,

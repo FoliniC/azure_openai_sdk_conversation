@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, Optional
 from collections import deque
 from datetime import datetime, timezone
+from typing import Any, Optional
 
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError

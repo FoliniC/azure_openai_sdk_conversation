@@ -3,10 +3,10 @@
 # ============================================================================
 """Context management modules for system prompts and entity state."""
 
-from .system_prompt import SystemPromptBuilder
+from .conversation_memory import ConversationMemoryManager
 from .entity_collector import EntityCollector
 from .mcp_manager import MCPManager
-from .conversation_memory import ConversationMemoryManager
+from .system_prompt import SystemPromptBuilder
 
 __all__ = [
     "SystemPromptBuilder",

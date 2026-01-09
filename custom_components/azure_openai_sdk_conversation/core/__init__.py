@@ -4,9 +4,9 @@
 """Core modules for Azure OpenAI conversation agent."""
 
 from .config import AgentConfig
+from .interfaces import ILLMClient, IMemoryManager, IStateManager
 from .logger import AgentLogger
-from .state import AgentState, MessageEntry, ConversationWindow
-from .interfaces import IStateManager, ILLMClient, IMemoryManager
+from .state import AgentState, ConversationWindow, MessageEntry
 
 __all__ = [
     "AgentConfig",

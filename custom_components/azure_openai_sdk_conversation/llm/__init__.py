@@ -5,8 +5,8 @@
 
 from .chat_client import ChatClient
 from .responses_client import ResponsesClient
-from .token_counter import TokenCounter
 from .stream_parser import SSEStreamParser
+from .token_counter import TokenCounter
 
 __all__ = [
     "ChatClient",

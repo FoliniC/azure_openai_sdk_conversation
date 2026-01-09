@@ -1,8 +1,11 @@
 """Test Diagnostics."""
-from unittest.mock import MagicMock, AsyncMock
+
+from unittest.mock import MagicMock
+
 import pytest
-from custom_components.cronostar.diagnostics import async_get_config_entry_diagnostics
 from custom_components.cronostar.const import DOMAIN
+from custom_components.cronostar.diagnostics import async_get_config_entry_diagnostics
+
 
 @pytest.mark.anyio
 async def test_diagnostics(hass):
@@ -14,7 +17,7 @@ async def test_diagnostics(hass):
     entry.title = "Test Entry"
     entry.data = {"test": "data"}
     entry.options = {"test": "options"}
-    
+
     # Mock runtime_data (coordinator)
     coordinator = MagicMock()
     coordinator.name = "Test Coord"
@@ -25,11 +28,11 @@ async def test_diagnostics(hass):
     coordinator.current_value = 20.0
     coordinator.available_profiles = ["Default"]
     entry.runtime_data = coordinator
-    
+
     hass.data[DOMAIN] = {"_global_setup_done": True, "version": "1.0.0"}
-    
+
     result = await async_get_config_entry_diagnostics(hass, entry)
-    
+
     assert result["entry"]["entry_id"] == "test_entry"
     assert result["controller_state"]["name"] == "Test Coord"
     assert result["component_status"]["global_setup_done"] is True

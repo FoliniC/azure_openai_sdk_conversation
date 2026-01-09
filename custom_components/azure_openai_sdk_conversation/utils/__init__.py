@@ -4,8 +4,8 @@
 """Utility modules for API version management and validation."""
 
 from .api_version import APIVersionManager
-from .validators import AzureOpenAIValidator
 from .search import WebSearchClient
+from .validators import AzureOpenAIValidator
 
 __all__ = [
     "APIVersionManager",

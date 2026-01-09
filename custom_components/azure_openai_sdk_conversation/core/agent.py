@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from functools import partial
 from datetime import datetime, timezone
+from functools import partial
 from typing import Any, Optional
 
 from homeassistant.components import conversation
@@ -26,16 +26,16 @@ from homeassistant.components.persistent_notification import async_create
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import intent as intent_helper
 
+from ..context.conversation_memory import ConversationMemoryManager
+from ..context.system_prompt import SystemPromptBuilder
 from ..llm.chat_client import ChatClient
 from ..llm.responses_client import ResponsesClient
 from ..local_intent.local_handler import LocalIntentHandler
-from ..context.system_prompt import SystemPromptBuilder
-from ..context.conversation_memory import ConversationMemoryManager
 from ..stats.manager import StatsManager
 from ..stats.metrics import RequestMetrics
+from ..tools import ToolManager
 from .config import AgentConfig
 from .logger import AgentLogger
-from ..tools import ToolManager
 
 
 class AzureOpenAIConversationAgent(AbstractConversationAgent):
@@ -386,6 +386,7 @@ class AzureOpenAIConversationAgent(AbstractConversationAgent):
         ):
             try:
                 import json
+
                 import tiktoken
 
                 tool_definitions = await self._tool_manager.get_tools_schema()

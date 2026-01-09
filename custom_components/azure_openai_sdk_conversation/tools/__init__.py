@@ -7,9 +7,9 @@ Provides Home Assistant function calling capabilities:
 - Management: Tool calling loop orchestration
 """
 
-from .tool_manager import ToolManager
 from .function_executor import FunctionExecutor
 from .schema_builder import ToolSchemaBuilder
+from .tool_manager import ToolManager
 
 __all__ = [
     "ToolManager",

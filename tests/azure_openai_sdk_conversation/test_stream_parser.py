@@ -1,12 +1,20 @@
 """Tests for the SSE stream parser."""
+
 import json
+
 import pytest
-from custom_components.azure_openai_sdk_conversation.llm.stream_parser import SSEStreamParser, ToolCallAccumulator
+
+from custom_components.azure_openai_sdk_conversation.llm.stream_parser import (
+    SSEStreamParser,
+    ToolCallAccumulator,
+)
+
 
 @pytest.fixture
 def parser():
     """SSEStreamParser instance."""
     return SSEStreamParser()
+
 
 def test_accumulator_partials():
     """Test accumulating partial JSON arguments."""
@@ -17,18 +25,20 @@ def test_accumulator_partials():
     assert acc.is_complete()
     assert json.loads(acc.accumulated_arguments) == {"key": "val"}
 
+
 def test_parse_stream_basic_content(parser):
     """Test parsing basic content from SSE stream."""
     lines = [
         'data: {"choices": [{"index": 0, "delta": {"content": "Hello"}}]}',
         'data: {"choices": [{"index": 0, "delta": {"content": " world!"}}]}',
-        'data: [DONE]'
+        "data: [DONE]",
     ]
-    
+
     content, tool_calls, tokens = parser.parse_stream(lines)
-    
+
     assert content == "Hello world!"
     assert tool_calls == []
+
 
 def test_parse_stream_tool_calls(parser):
     """Test parsing tool calls from SSE stream."""
@@ -40,11 +50,11 @@ def test_parse_stream_tool_calls(parser):
         'data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "{\\"foo\\": "}}]}}]}',
         # Chunk 3: Argument fragment 2
         'data: {"choices": [{"index": 0, "delta": {"tool_calls": [{"index": 0, "function": {"arguments": "\\"bar\\"}"}}]}}]}',
-        'data: [DONE]'
+        "data: [DONE]",
     ]
 
     content, tool_calls, tokens = parser.parse_stream(lines)
-    
+
     assert len(tool_calls) == 1
     call = tool_calls[0]
     assert call["id"] == "call_123"

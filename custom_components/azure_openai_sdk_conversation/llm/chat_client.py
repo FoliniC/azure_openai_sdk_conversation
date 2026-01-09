@@ -12,19 +12,16 @@ Handles:
 from __future__ import annotations
 
 import asyncio
+from typing import Any, Callable, Optional
 
-from typing import Any, Optional, Callable
-
+import httpx
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 
-import httpx
-
-from .stream_parser import SSEStreamParser
-from .token_counter import TokenCounter
-
 from ..core.config import AgentConfig
 from ..core.logger import AgentLogger
+from .stream_parser import SSEStreamParser
+from .token_counter import TokenCounter
 
 
 class ChatClient:

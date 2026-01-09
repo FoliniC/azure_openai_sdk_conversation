@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from typing import Final, List
+
 from homeassistant.const import Platform
 
 # Integration domain

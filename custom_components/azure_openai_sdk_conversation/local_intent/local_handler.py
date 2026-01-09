@@ -15,10 +15,10 @@ from homeassistant.components.conversation import ConversationInput, Conversatio
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import intent as intent_helper
 
-from .text_normalizer import TextNormalizer
-from .entity_matcher import EntityMatcher
 from ..core.config import AgentConfig
 from ..core.logger import AgentLogger
+from .entity_matcher import EntityMatcher
+from .text_normalizer import TextNormalizer
 
 
 class LocalIntentHandler:

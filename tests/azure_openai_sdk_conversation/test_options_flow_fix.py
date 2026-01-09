@@ -1,11 +1,13 @@
-import sys
-from unittest.mock import MagicMock
-import pytest
-
 # Ensure we can import mock_ha from the current directory
 import os
+import sys
+from unittest.mock import MagicMock
+
+import pytest
+
 sys.path.append(os.path.dirname(__file__))
 import mock_ha
+
 
 # Define a strict parent class that mimics object.__init__ behavior (no args)
 class StrictOptionsFlow:
@@ -15,6 +17,7 @@ class StrictOptionsFlow:
     @property
     def config_entry(self):
         return self._config_entry
+
 
 # Monkeypatch the mock to use our StrictOptionsFlow
 # This must be done BEFORE importing the module under test
@@ -39,8 +42,12 @@ mock_selector.SelectSelectorMode = MagicMock
 mock_selector.TemplateSelector = MagicMock
 
 # Now import the module under test
-from custom_components.azure_openai_sdk_conversation.options_flow import AzureOpenAIOptionsFlow
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry  # noqa: E402
+
+from custom_components.azure_openai_sdk_conversation.options_flow import (
+    AzureOpenAIOptionsFlow,
+)  # noqa: E402
+
 
 @pytest.fixture
 def patch_options_flow():
@@ -50,6 +57,7 @@ def patch_options_flow():
     yield
     mock_ha.ha.config_entries.OptionsFlow = original
 
+
 @pytest.mark.anyio
 async def test_options_flow_init_strict(patch_options_flow):
     """
@@ -58,11 +66,11 @@ async def test_options_flow_init_strict(patch_options_flow):
     config_entry = MagicMock(spec=ConfigEntry)
     config_entry.data = {}
     config_entry.options = {}
-    
-    # This should succeed. 
-    # If the bug was present (super().__init__(config_entry)), it would raise TypeError 
+
+    # This should succeed.
+    # If the bug was present (super().__init__(config_entry)), it would raise TypeError
     # because StrictOptionsFlow.__init__ accepts no arguments.
     flow = AzureOpenAIOptionsFlow(config_entry)
-    
+
     # Verify we manually set the config_entry (backing field)
     assert flow.config_entry == config_entry

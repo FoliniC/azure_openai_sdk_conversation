@@ -5,6 +5,7 @@ Minimal abstraction layer to decouple agent logic from HA-specific implementatio
 """
 
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from typing import Any, Optional, Protocol
 

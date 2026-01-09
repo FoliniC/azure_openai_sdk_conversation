@@ -5,14 +5,14 @@ To run:
     pytest tests/test_tools.py
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from homeassistant.core import HomeAssistant
 
 from custom_components.azure_openai_sdk_conversation.tools import (
-    ToolSchemaBuilder,
     FunctionExecutor,
     ToolManager,
+    ToolSchemaBuilder,
 )
 
 

@@ -5,11 +5,12 @@ lo stato e invia solo le entità che hanno cambiato stato.
 """
 
 from __future__ import annotations
+
 import asyncio
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict
-from dataclasses import dataclass
 
 _LOGGER = logging.getLogger(__name__)
 

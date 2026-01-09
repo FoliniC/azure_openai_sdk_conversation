@@ -9,13 +9,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from homeassistant.components import conversation
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import (
     area_registry as ar,
+)
+from homeassistant.helpers import (
     device_registry as dr,
+)
+from homeassistant.helpers import (
     entity_registry as er,
 )
-from homeassistant.components import conversation
 
 from ..core.config import AgentConfig
 from ..core.logger import AgentLogger

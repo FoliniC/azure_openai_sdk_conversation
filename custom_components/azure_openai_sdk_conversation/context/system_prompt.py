@@ -13,10 +13,10 @@ from typing import Optional
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.template import Template as HATemplate
 
-from .entity_collector import EntityCollector
-from .mcp_manager import MCPManager
 from ..core.config import AgentConfig
 from ..core.logger import AgentLogger
+from .entity_collector import EntityCollector
+from .mcp_manager import MCPManager
 
 
 class SystemPromptBuilder:

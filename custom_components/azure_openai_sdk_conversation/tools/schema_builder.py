@@ -3,10 +3,11 @@
 Tool schema builder - converte HA services in OpenAI function schemas
 """
 
+import logging
 from typing import Any
+
 import voluptuous as vol
 from homeassistant.core import HomeAssistant
-import logging
 
 _LOGGER = logging.getLogger(__name__)
 
