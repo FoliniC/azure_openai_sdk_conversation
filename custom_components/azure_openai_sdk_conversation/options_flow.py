@@ -21,6 +21,9 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    CONF_API_BASE,
+    CONF_API_KEY,
+    CONF_CHAT_MODEL,
     CONF_API_TIMEOUT,
     CONF_API_VERSION,
     CONF_EXPOSED_ENTITIES_LIMIT,
@@ -123,7 +126,7 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
         """Manage the options."""
         # If the user has submitted the form, we recalculate token_param consistent with model+version.
         if user_input is not None:
-            model = (self.config_entry.data.get("chat_model") or "").lower()
+            model = (self.config_entry.data.get(CONF_CHAT_MODEL) or "").lower()
 
             # Determine the chosen api-version (if not provided, use the current one)
             chosen_version = str(
@@ -243,7 +246,7 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
         )
 
         # Add options for "o*" (reasoning) models
-        model = self.config_entry.data.get("chat_model", "").lower()
+        model = self.config_entry.data.get(CONF_CHAT_MODEL, "").lower()
         if model.startswith("o"):
             schema = schema.extend(
                 {
@@ -651,7 +654,14 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
                 }
             )
 
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            description_placeholders={
+                "model": self.config_entry.data.get(CONF_CHAT_MODEL, "Unknown Model"),
+                "api_base": self.config_entry.data.get(CONF_API_BASE, "Unknown API Base"),
+            },
+        )
 
 
 @callback

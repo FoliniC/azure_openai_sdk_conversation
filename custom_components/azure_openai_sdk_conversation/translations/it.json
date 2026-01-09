@@ -6,18 +6,57 @@
     "error": {
       "cannot_connect": "Impossibile connettersi",
       "invalid_auth": "Autenticazione non valida",
-      "unknown": "Errore imprevisto"
+      "unknown": "Errore imprevisto",
+      "invalid_deployment": "Deployment non trovato (404). Controlla API Base e nome Modello.",
+      "value_out_of_range": "Valore fuori intervallo",
+      "invalid_number": "Numero non valido"
     },
     "step": {
       "user": {
-        "description": "Ottieni l'URL di base dell'API e la versione dall'URI di destinazione in EndPoint in Azure AI Foundry o nel portale di Azure.",
+        "description": "Ottieni l\'URL di base dell\'API e la versione dall\'URI di destinazione in EndPoint in Azure AI Foundry o nel portale di Azure.",
         "data": {
           "api_key": "Chiave API",
-          "api_base": "URL di base dell'API"
+          "api_base": "URL di base dell\'API",
+          "chat_model": "Modello",
+          "api_version": "Versione API"
         },
         "data_description": {
           "api_key": "",
           "api_base": "URL di base di esempio: https://xyz.cognitiveservices.azure.com"
+        }
+      },
+      "params": {
+        "data": {
+            "api_timeout": "Timeout API",
+            "max_tokens": "Numero massimo di token da restituire nella risposta",
+            "temperature": "Temperatura",
+            "top_p": "Top P",
+            "log_level": "Livello di Log",
+            "log_payload_request": "Registra payload delle richieste",
+            "log_payload_response": "Registra payload delle risposte",
+            "log_system_message": "Registra messaggio di sistema",
+            "log_max_payload_chars": "Caratteri massimi payload da registrare",
+            "log_max_sse_lines": "Linee SSE massime da registrare",
+            "early_wait_enable": "Abilita attesa anticipata",
+            "early_wait_seconds": "Secondi di attesa anticipata",
+            "vocabulary_enable": "Abilita normalizzazione vocabolario",
+            "synonyms_file": "Percorso file sinonimi",
+            "log_utterances": "Registra espressioni utente",
+            "utterances_log_path": "Percorso log espressioni",
+            "local_intent_enable": "Abilita Gestione Intenti Locali",
+            "stats_enable": "Abilita Statistiche",
+            "stats_component_log_path": "Percorso Log Statistiche Componente",
+            "stats_llm_log_path": "Percorso Log Statistiche LLM",
+            "mcp_enabled": "Abilita Server MCP (Conversazioni Stateful)",
+            "mcp_ttl_seconds": "TTL Contesto MCP (Secondi)",
+            "tools_enable": "Abilita Chiamata Strumenti",
+            "tools_whitelist": "Whitelist Strumenti",
+            "tools_max_iterations": "Iterazioni massime strumenti",
+            "tools_max_calls_per_minute": "Chiamate strumenti massime al minuto",
+            "tools_parallel_execution": "Abilita esecuzione parallela strumenti",
+            "sliding_window_enable": "Abilita Finestra Scorrevole",
+            "sliding_window_max_tokens": "Token Massimi Finestra Scorrevole",
+            "sliding_window_preserve_system": "Preserva Prompt di Sistema nella Finestra"
         }
       }
     }
@@ -25,27 +64,51 @@
   "options": {
     "step": {
       "init": {
+        "description": "Modello corrente: {model}\nBase API: {api_base}",
         "data": {
           "prompt": "Istruzioni",
           "chat_model": "Modello",
           "max_tokens": "Numero massimo di token da restituire nella risposta",
           "temperature": "Temperatura",
           "top_p": "Top P",
-          "llm_hass_api": "Vuoi usare l'API LLM HASS?",
+          "llm_hass_api": "Vuoi usare l\'API LLM HASS?",
           "recommended": "Impostazioni del modello consigliate",
           "reasoning_effort": "Sforzo di ragionamento",
           "web_search": "Abilita la ricerca web",
           "search_context_size": "Dimensione del contesto di ricerca",
           "user_location": "Includi la posizione della casa",
           "ssl_verify": "Verifica certificato SSL",
+          "exposed_entities_limit": "Limite Entità Esposte",
+          "api_timeout": "Timeout API (secondi)",
+          "api_version": "Versione API",
+          "log_level": "Livello di Log",
           "log_payload_request": "Registra payload delle richieste",
           "log_payload_response": "Registra payload delle risposte",
           "log_system_message": "Registra messaggio di sistema",
+          "log_max_payload_chars": "Caratteri massimi payload da registrare",
+          "log_max_sse_lines": "Linee SSE massime da registrare",
+          "payload_log_path": "Percorso Log Payload",
           "early_wait_enable": "Abilita attesa anticipata",
+          "early_wait_seconds": "Secondi di attesa anticipata",
           "vocabulary_enable": "Abilita normalizzazione vocabolario",
+          "synonyms_file": "Percorso file sinonimi",
           "log_utterances": "Registra espressioni utente",
+          "utterances_log_path": "Percorso log espressioni",
+          "local_intent_enable": "Abilita Gestione Intenti Locali",
+          "stats_override_mode": "Modalità Override Statistiche",
+          "stats_aggregated_file": "Percorso File Statistiche Aggregate",
+          "stats_aggregation_interval": "Intervallo Aggregazione Statistiche (Minuti)",
           "mcp_enabled": "Abilita Server MCP (Conversazioni Stateful)",
-          "local_intent_enable": "Abilita Gestione Intenti Locali"
+          "mcp_ttl_seconds": "TTL Contesto MCP (Secondi)",
+          "sliding_window_enable": "Abilita Finestra Scorrevole",
+          "sliding_window_max_tokens": "Token Massimi Finestra Scorrevole",
+          "sliding_window_preserve_system": "Preserva Prompt di Sistema nella Finestra",
+          "sliding_window_token_buffer": "Buffer Token Finestra Scorrevole",
+          "tools_enable": "Abilita Chiamata Strumenti",
+          "tools_whitelist": "Whitelist Strumenti",
+          "tools_max_iterations": "Iterazioni massime strumenti",
+          "tools_max_calls_per_minute": "Chiamate strumenti massime al minuto",
+          "tools_parallel_execution": "Abilita esecuzione parallela strumenti"
         },
         "data_description": {
           "prompt": "Indica come deve rispondere il LLM. Questo può essere un modello.",
@@ -53,16 +116,23 @@
           "web_search": "Consenti al modello di cercare nel web le informazioni più recenti prima di generare una risposta",
           "search_context_size": "Guida di alto livello per la quantità di spazio della finestra di contesto da utilizzare per la ricerca",
           "user_location": "Affina i risultati della ricerca in base alla geografia",
-          "ssl_verify": "Verifica il certificato SSL dell'endpoint di Azure OpenAI. Disabilita solo per test con certificati autofirmati.",
-          "log_payload_request": "Registra il payload completo della richiesta inviata all'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
-          "log_payload_response": "Registra il payload completo della risposta ricevuta dall'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
+          "ssl_verify": "Verifica il certificato SSL dell\'endpoint di Azure OpenAI. Disabilita solo per test con certificati autofirmati.",
+          "log_payload_request": "Registra il payload completo della richiesta inviata all\'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
+          "log_payload_response": "Registra il payload completo della risposta ricevuta dall\'API di Azure OpenAI. Utile per il debug ma può essere verboso.",
           "log_system_message": "Registra il messaggio di sistema generato che viene inviato al modello. Utile per il debug del contesto fornito al LLM.",
-          "early_wait_enable": "Se il modello impiega troppo tempo a rispondere, l'agente chiederà se si desidera attendere. La risposta verrà recapitata tramite una notifica.",
-          "vocabulary_enable": "Normalizza l'input dell'utente sostituendo i sinonimi (es. 'spegni' e 'disattiva' sono trattati allo stesso modo). Migliora il riconoscimento degli intenti locali.",
+          "early_wait_enable": "Se il modello impiega troppo tempo a rispondere, l\'agente chiederà se si desidera attendere. La risposta verrà recapitata tramite una notifica.",
+          "vocabulary_enable": "Normalizza l\'input dell\'utente sostituendo i sinonimi (es. 'spegni' e 'disattiva' sono trattati allo stesso modo). Migliora il riconoscimento degli intenti locali.",
           "log_utterances": "Registra le espressioni utente originali e normalizzate in un file. Utile per il debug del processo di normalizzazione del testo.",
-          "mcp_enabled": "Abilita il server Master Control Program (MCP) per mantenere il contesto della conversazione. Invia solo le modifiche di stato delle entità dopo il primo messaggio, riducendo l'uso di token.",
-          "local_intent_enable": "Gestisce comandi semplici come accendere/spegnere le luci direttamente senza chiamare il LLM. È più veloce ed economico."
-
+          "mcp_enabled": "Abilita il server Master Control Program (MCP) per mantenere il contesto della conversazione. Invia solo le modifiche di stato delle entità dopo il primo messaggio, riducendo l\'uso di token.",
+          "local_intent_enable": "Gestisce comandi semplici come accendere/spegnere le luci direttamente senza chiamare il LLM. È più veloce ed economico.",
+          "exposed_entities_limit": "Numero massimo di entità da esporre al modello. Aumentare questo valore può aumentare la latenza e l\'uso di token.",
+          "api_timeout": "Timeout per le chiamate API in secondi.",
+          "tools_enable": "Consenti al modello di chiamare strumenti/servizi di Home Assistant.",
+          "tools_whitelist": "Elenco separato da virgole di domini o servizi da consentire (es. 'light,switch' o 'light.turn_on').",
+          "sliding_window_enable": "Mantiene una finestra mobile della cronologia delle conversazioni entro i limiti dei token.",
+          "sliding_window_max_tokens": "Token massimi da utilizzare per la cronologia prima del troncamento.",
+          "sliding_window_preserve_system": "Mantieni sempre il prompt di sistema quando tronchi la cronologia.",
+          "sliding_window_token_buffer": "Buffer da riservare per evitare di raggiungere i limiti esatti dei token."
         }
       }
     },
@@ -85,12 +155,19 @@
         "medium": "Medio",
         "high": "Alto"
       }
+    },
+    "stats_override_mode": {
+      "options": {
+        "default": "Predefinito (Usa Impostazione Globale)",
+        "enable": "Abilita",
+        "disable": "Disabilita"
+      }
     }
   },
   "services": {
     "generate_image": {
       "name": "Genera immagine",
-      "description": "Trasforma un prompt in un'immagine",
+      "description": "Trasforma un prompt in un\'immagine",
       "fields": {
         "config_entry": {
           "name": "Voce di configurazione",
@@ -98,20 +175,20 @@
         },
         "prompt": {
           "name": "Prompt",
-          "description": "Il testo da trasformare in un'immagine",
+          "description": "Il testo da trasformare in un\'immagine",
           "example": "Una foto di un cane"
         },
         "size": {
           "name": "Dimensione",
-          "description": "La dimensione dell'immagine da generare"
+          "description": "La dimensione dell\'immagine da generare"
         },
         "quality": {
           "name": "Qualità",
-          "description": "La qualità dell'immagine che verrà generata"
+          "description": "La qualità dell\'immagine che verrà generata"
         },
         "style": {
           "name": "Stile",
-          "description": "Lo stile dell'immagine generata"
+          "description": "Lo stile dell\'immagine generata"
         }
       }
     },

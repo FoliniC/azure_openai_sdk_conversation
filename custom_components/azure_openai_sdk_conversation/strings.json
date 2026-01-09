@@ -4,19 +4,59 @@
       "user": {
         "data": {
           "api_key": "[%key:common::config_flow::data::api_key%]",
-          "api_base": "[%key:common::config_flow::data::api_base%]"
+          "api_base": "[%key:common::config_flow::data::api_base%]",
+          "chat_model": "[%key:common::generic::model%]",
+          "api_version": "API Version"
+        }
+      },
+      "params": {
+        "data": {
+            "api_timeout": "API Timeout",
+            "max_tokens": "Maximum tokens to return in response",
+            "temperature": "Temperature",
+            "top_p": "Top P",
+            "log_level": "Log Level",
+            "log_payload_request": "Log request payloads",
+            "log_payload_response": "Log response payloads",
+            "log_system_message": "Log system message",
+            "log_max_payload_chars": "Max Payload Characters to Log",
+            "log_max_sse_lines": "Max SSE Lines to Log",
+            "early_wait_enable": "Enable early wait",
+            "early_wait_seconds": "Early Wait Seconds",
+            "vocabulary_enable": "Enable vocabulary normalization",
+            "synonyms_file": "Synonyms File Path",
+            "log_utterances": "Log user utterances",
+            "utterances_log_path": "Utterances Log Path",
+            "local_intent_enable": "Enable Local Intent Handling",
+            "stats_enable": "Enable Statistics",
+            "stats_component_log_path": "Component Stats Log Path",
+            "stats_llm_log_path": "LLM Stats Log Path",
+            "mcp_enabled": "Enable MCP Server (Stateful Conversations)",
+            "mcp_ttl_seconds": "MCP Context TTL (Seconds)",
+            "tools_enable": "Enable Tool Calling",
+            "tools_whitelist": "Tools Whitelist",
+            "tools_max_iterations": "Max Tool Iterations",
+            "tools_max_calls_per_minute": "Max Tool Calls Per Minute",
+            "tools_parallel_execution": "Enable Parallel Tool Execution",
+            "sliding_window_enable": "Enable Sliding Window",
+            "sliding_window_max_tokens": "Sliding Window Max Tokens",
+            "sliding_window_preserve_system": "Preserve System Prompt in Window"
         }
       }
     },
     "error": {
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "unknown": "[%key:common::config_flow::error::unknown%]",
+      "invalid_deployment": "Deployment not found (404). Check API Base and Model name.",
+      "value_out_of_range": "Value out of range",
+      "invalid_number": "Invalid number"
     }
   },
   "options": {
     "step": {
       "init": {
+        "description": "Current Model: {model}\nAPI Base: {api_base}",
         "data": {
           "prompt": "Instructions",
           "chat_model": "[%key:common::generic::model%]",
@@ -30,14 +70,37 @@
           "search_context_size": "Search context size",
           "user_location": "Include home location",
           "ssl_verify": "Verify SSL certificate",
+          "exposed_entities_limit": "Exposed Entities Limit",
+          "api_timeout": "API Timeout (seconds)",
+          "api_version": "API Version",
+          "log_level": "Log Level",
           "log_payload_request": "Log request payloads",
           "log_payload_response": "Log response payloads",
           "log_system_message": "Log system message",
+          "log_max_payload_chars": "Max Payload Characters to Log",
+          "log_max_sse_lines": "Max SSE Lines to Log",
+          "payload_log_path": "Payload Log Path",
           "early_wait_enable": "Enable early wait",
+          "early_wait_seconds": "Early Wait Seconds",
           "vocabulary_enable": "Enable vocabulary normalization",
+          "synonyms_file": "Synonyms File Path",
           "log_utterances": "Log user utterances",
+          "utterances_log_path": "Utterances Log Path",
+          "local_intent_enable": "Enable Local Intent Handling",
+          "stats_override_mode": "Statistics Override Mode",
+          "stats_aggregated_file": "Aggregated Stats File Path",
+          "stats_aggregation_interval": "Stats Aggregation Interval (Minutes)",
           "mcp_enabled": "Enable MCP Server (Stateful Conversations)",
-          "local_intent_enable": "Enable Local Intent Handling"
+          "mcp_ttl_seconds": "MCP Context TTL (Seconds)",
+          "sliding_window_enable": "Enable Sliding Window",
+          "sliding_window_max_tokens": "Sliding Window Max Tokens",
+          "sliding_window_preserve_system": "Preserve System Prompt in Window",
+          "sliding_window_token_buffer": "Sliding Window Token Buffer",
+          "tools_enable": "Enable Tool Calling",
+          "tools_whitelist": "Tools Whitelist",
+          "tools_max_iterations": "Max Tool Iterations",
+          "tools_max_calls_per_minute": "Max Tool Calls Per Minute",
+          "tools_parallel_execution": "Enable Parallel Tool Execution"
         },
         "data_description": {
           "prompt": "Instruct how the LLM should respond. This can be a template.",
@@ -53,7 +116,15 @@
           "vocabulary_enable": "Normalize user input by replacing synonyms (e.g., 'turn off' and 'deactivate' are treated as the same). This improves local intent recognition.",
           "log_utterances": "Log original and normalized user utterances to a file. This is useful for debugging the text normalization process.",
           "mcp_enabled": "Enable the Master Control Program (MCP) server to maintain conversation context. This sends only entity state changes after the first message, reducing token usage.",
-          "local_intent_enable": "Handle simple commands like turning lights on/off directly without calling the LLM. This is faster and cheaper."
+          "local_intent_enable": "Handle simple commands like turning lights on/off directly without calling the LLM. This is faster and cheaper.",
+          "exposed_entities_limit": "Maximum number of entities to expose to the model. Increasing this may increase latency and token usage.",
+          "api_timeout": "Timeout for API calls in seconds.",
+          "tools_enable": "Allow the model to call Home Assistant tools/services.",
+          "tools_whitelist": "Comma-separated list of domains or services to allow (e.g., 'light,switch' or 'light.turn_on').",
+          "sliding_window_enable": "Maintain a rolling window of conversation history within token limits.",
+          "sliding_window_max_tokens": "Maximum tokens to use for history before truncating.",
+          "sliding_window_preserve_system": "Always keep the system prompt when truncating history.",
+          "sliding_window_token_buffer": "Buffer to reserve to avoid hitting exact token limits."
         }
       }
     },
