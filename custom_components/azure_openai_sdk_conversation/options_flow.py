@@ -658,7 +658,9 @@ class AzureOpenAIOptionsFlow(OptionsFlow):
             data_schema=schema,
             description_placeholders={
                 "model": self.config_entry.data.get(CONF_CHAT_MODEL, "Unknown Model"),
-                "api_base": self.config_entry.data.get(CONF_API_BASE, "Unknown API Base"),
+                "api_base": self.config_entry.data.get(
+                    CONF_API_BASE, "Unknown API Base"
+                ),
             },
         )
 
